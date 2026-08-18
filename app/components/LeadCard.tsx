@@ -124,12 +124,27 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
             </div>
 
 
-            {(lead.contactName || lead.contactEmail) && (
-              <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-slate-600">
-                {lead.contactName && <span>👤 {lead.contactName}</span>}
-                {lead.contactEmail && <span>✉ {lead.contactEmail}</span>}
-              </div>
-            )}
+            {/* ZoomInfo contact row */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+              {lead.contactName && (
+                <span className="text-slate-700">
+                  👤 <span className="font-medium">{lead.contactName}</span>
+                  {lead.contactTitle && <span className="text-slate-500"> · {lead.contactTitle}</span>}
+                </span>
+              )}
+              {lead.contactEmail && <span className="text-slate-600">✉ {lead.contactEmail}</span>}
+              {lead.contactPhone && <span className="text-slate-600">📞 {lead.contactPhone}</span>}
+              <a
+                href={`https://app.zoominfo.com/#/apps/search/v2/person/results?companyName=${encodeURIComponent(lead.company)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition"
+                title="Search contacts in ZoomInfo"
+              >
+                <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor"><path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/></svg>
+                ZoomInfo
+              </a>
+            </div>
           </div>
         </div>
 

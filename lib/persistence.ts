@@ -63,6 +63,8 @@ export function mergeLeads(fresh: Lead[], overrides: Record<string, LeadStatus>)
  * Accumulate fresh leads into an existing list.
  * Existing leads are never removed. New companies are appended.
  * Statuses (contacted/dismissed) are preserved on both sides.
+ * ZoomInfo enrichment fields (contactName, contactTitle, zoomInfoId) are
+ * always updated from the fresh batch so contact data stays current.
  * Result is sorted best-score-first.
  */
 export function accumulateLeads(
@@ -70,17 +72,36 @@ export function accumulateLeads(
   fresh: Lead[],
   overrides: Record<string, LeadStatus>
 ): Lead[] {
-  const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-  const existingKeys = new Set(existing.map((l) => normalize(l.zoomInfoId ?? l.company)));
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
 
+  // Build a lookup of fresh leads by normalized key
+  const freshByKey = new Map<string, Lead>();
+  for (const l of fresh) freshByKey.set(norm(l.zoomInfoId ?? l.company), l);
+
+  // Update existing leads with fresh ZoomInfo enrichment
+  const updated = existing.map((l) => {
+    const freshLead = freshByKey.get(norm(l.zoomInfoId ?? l.company));
+    if (!freshLead) return l;
+    return {
+      ...l,
+      contactName:  freshLead.contactName  ?? l.contactName,
+      contactTitle: freshLead.contactTitle ?? l.contactTitle,
+      contactEmail: freshLead.contactEmail ?? l.contactEmail,
+      contactPhone: freshLead.contactPhone ?? l.contactPhone,
+      zoomInfoId:   freshLead.zoomInfoId   ?? l.zoomInfoId,
+    };
+  });
+
+  // Append genuinely new companies
+  const existingKeys = new Set(existing.map((l) => norm(l.zoomInfoId ?? l.company)));
   const newOnes = fresh
-    .filter((l) => !existingKeys.has(normalize(l.zoomInfoId ?? l.company)))
+    .filter((l) => !existingKeys.has(norm(l.zoomInfoId ?? l.company)))
     .map((l) => {
       const saved = overrides[l.zoomInfoId ?? l.company];
       return saved ? { ...l, status: saved } : l;
     });
 
-  return [...existing, ...newOnes].sort((a, b) => b.blendedScore - a.blendedScore);
+  return [...updated, ...newOnes].sort((a, b) => b.blendedScore - a.blendedScore);
 }
 
 

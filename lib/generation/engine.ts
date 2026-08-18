@@ -6,6 +6,7 @@ import { BuyerProfile, GenerateOptions, Lead } from '../types';
 import { runSignalSearches } from './web-search';
 import { extractAndScoreLeads } from './claude-scorer';
 import { getExistingVendorNames } from './zoho-dedup';
+import { enrichLeadsWithZoomInfo } from './zoominfo-enrich';
 
 export interface GenerationResult {
   leads: Lead[];
@@ -29,6 +30,9 @@ export async function generateLeads(
 
   // 3. Sort best-first
   leads.sort((a, b) => b.blendedScore - a.blendedScore);
+
+  // 3.5 ZoomInfo enrichment — adds contactName, contactEmail, contactPhone
+  leads = await enrichLeadsWithZoomInfo(leads);
 
   // 4. Zoho dedup (graceful — won't throw)
   const existingNames = await getExistingVendorNames(profile.zohoOwnerName);

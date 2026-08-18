@@ -16,6 +16,7 @@ export interface Lead {
   employeeSize: string;
   location: string;
   contactName?: string;
+  contactTitle?: string;
   contactEmail?: string;
   contactPhone?: string;
   zoomInfoId?: string;
