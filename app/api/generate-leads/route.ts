@@ -3,7 +3,7 @@ import { DEFAULT_BUYERS } from '@/lib/buyers';
 import { generateLeads } from '@/lib/generation/engine';
 import { GenerateOptions } from '@/lib/types';
 
-export const maxDuration = 60; // seconds — Vercel/Next edge limit
+export const maxDuration = 300; // seconds — requires Vercel Pro plan
 
 export async function POST(req: NextRequest) {
   try {

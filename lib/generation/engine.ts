@@ -31,8 +31,11 @@ export async function generateLeads(
   // 3. Sort best-first
   leads.sort((a, b) => b.blendedScore - a.blendedScore);
 
-  // 3.5 ZoomInfo enrichment — adds contactName, contactEmail, contactPhone
-  leads = await enrichLeadsWithZoomInfo(leads);
+  // 3.5 ZoomInfo enrichment — top 15 leads only to stay within time budget
+  const toEnrich  = leads.slice(0, 15);
+  const remainder = leads.slice(15);
+  const enriched  = await enrichLeadsWithZoomInfo(toEnrich);
+  leads = [...enriched, ...remainder];
 
   // 4. Zoho dedup (graceful — won't throw)
   const existingNames = await getExistingVendorNames(profile.zohoOwnerName);
