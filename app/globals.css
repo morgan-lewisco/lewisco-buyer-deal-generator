@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  --color-lewisco-50:  #f0fdf4;
+  --color-lewisco-100: #dcfce7;
+  --color-lewisco-200: #bbf7d0;
+  --color-lewisco-300: #86efac;
+  --color-lewisco-400: #4ade80;
+  --color-lewisco-500: #22a84a;
+  --color-lewisco-600: #16873a;
+  --color-lewisco-700: #15692e;
+  --color-lewisco-800: #145228;
+  --color-lewisco-900: #0f3d1e;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: #f8fafc;
+}
+
+/* Metallic platinum header gradient */
+.header-platinum {
+  background: linear-gradient(180deg,
+    #6b6e78 0%,
+    #4a4d56 20%,
+    #32353d 50%,
+    #3e4149 75%,
+    #5a5d66 100%
+  );
+}
+
+/* Theater marquee glow for LIVE badge */
+@keyframes theater-glow {
+  0%, 100% {
+    box-shadow: 0 0 2px rgba(34, 197, 94, 0.4);
+    background-color: #16a34a;
+  }
+  50% {
+    box-shadow: 0 0 5px rgba(74, 222, 128, 0.5), 0 0 8px rgba(34, 197, 94, 0.3);
+    background-color: #1aa84d;
+  }
+}
+
+.live-badge {
+  animation: theater-glow 2.8s ease-in-out infinite;
+}

@@ -1,0 +1,169 @@
+'use client';
+import { Lead, LeadStatus } from '@/lib/types';
+
+interface Props {
+  lead: Lead;
+  rank: number;
+  onContact: (id: string) => void;
+  onDismiss: (id: string) => void;
+  onUndoDismiss: (id: string) => void;
+}
+
+const SIGNAL_CONFIG: Record<string, { label: string; className: string }> = {
+  plant_closure:       { label: 'Plant Closure',       className: 'bg-red-100 text-red-800 border-red-200' },
+  layoffs:             { label: 'Layoffs',              className: 'bg-orange-100 text-orange-800 border-orange-200' },
+  merger_acquisition:  { label: 'Mergers & Acquisitions', className: 'bg-amber-100 text-amber-800 border-amber-200' },
+  divestiture:         { label: 'Divestiture',         className: 'bg-purple-100 text-purple-800 border-purple-200' },
+  facility_relocation: { label: 'Facility Relocation', className: 'bg-blue-100 text-blue-800 border-blue-200' },
+  lookalike:           { label: 'Comparable Zoho Accounts', className: 'bg-lewisco-100 text-lewisco-800 border-lewisco-200' },
+};
+
+const CATEGORY_CONFIG: Record<string, string> = {
+  beverages:         'bg-blue-100 text-blue-800',
+  beverage:          'bg-blue-100 text-blue-800',
+  snacks:            'bg-orange-100 text-orange-800',
+  candy:             'bg-pink-100 text-pink-800',
+  'sports nutrition':'bg-purple-100 text-purple-800',
+  'canned grocery':  'bg-teal-100 text-teal-800',
+  'canned seafood':  'bg-cyan-100 text-cyan-800',
+  dairy:             'bg-sky-100 text-sky-800',
+  condiments:        'bg-amber-100 text-amber-800',
+  pantry:            'bg-amber-100 text-amber-800',
+  'international foods': 'bg-indigo-100 text-indigo-800',
+  'hispanic/specialty':  'bg-indigo-100 text-indigo-800',
+  sweeteners:        'bg-yellow-100 text-yellow-800',
+  'pet food':        'bg-violet-100 text-violet-800',
+};
+
+function categoryClass(cat: string): string {
+  return CATEGORY_CONFIG[cat.toLowerCase()] ?? 'bg-slate-100 text-slate-600';
+}
+
+
+export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss }: Props) {
+  const isContacted = lead.status === 'contacted';
+  const isDismissed = lead.status === 'dismissed';
+
+  const cardClass = [
+    'rounded-lg border p-4 transition-all',
+    isContacted  ? 'border-emerald-200 bg-emerald-50/40' : '',
+    isDismissed  ? 'border-red-200 bg-red-50/30 opacity-70' : '',
+    !isContacted && !isDismissed ? 'border-slate-200 bg-white' : '',
+  ].join(' ');
+
+  const titleClass = [
+    'font-semibold text-base',
+    isContacted  ? 'text-emerald-800' : '',
+    isDismissed  ? 'line-through text-red-700' : '',
+    !isContacted && !isDismissed ? 'text-slate-900' : '',
+  ].join(' ');
+
+  return (
+    <div className={cardClass}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 min-w-0">
+          <span className="mt-0.5 flex-shrink-0 w-6 text-center text-xs font-bold text-slate-400">#{rank}</span>
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              {lead.sourceUrl ? (
+                <a href={lead.sourceUrl} target="_blank" rel="noopener noreferrer"
+                   className={`${titleClass} hover:underline`}>
+                  {lead.company}
+                </a>
+              ) : (
+                <span className={titleClass}>{lead.company}</span>
+              )}
+              {isContacted && (
+                <span className="text-xs font-medium text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">✓ Contacted</span>
+              )}
+              {isDismissed && (
+                <span className="text-xs font-medium text-red-700 bg-red-100 rounded-full px-2 py-0.5">Dismissed</span>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-1.5 mt-1.5">
+              <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${categoryClass(lead.category)}`}>
+                {lead.category}
+              </span>
+              {SIGNAL_CONFIG[lead.signalType] && (
+                <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium border ${SIGNAL_CONFIG[lead.signalType].className}`}>
+                  {SIGNAL_CONFIG[lead.signalType].label}
+                </span>
+              )}
+            </div>
+
+            {/* Why now + Google search */}
+            <div className="mt-2 flex items-start gap-2">
+              <p className="text-sm text-slate-700 leading-snug italic flex-1">&ldquo;{lead.whyNow}&rdquo;</p>
+              <a
+                href={`https://www.google.com/search?q=${encodeURIComponent(lead.whyNow)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Search this on Google"
+                className="flex-shrink-0 mt-0.5"
+              >
+                <svg viewBox="0 0 24 24" className="w-4 h-4 hover:opacity-70 transition-opacity" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                </svg>
+              </a>
+            </div>
+
+            {/* Meta */}
+            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
+              {lead.revenueRange && !lead.revenueRange.toLowerCase().includes('unknown') && <span>{lead.revenueRange}</span>}
+              {lead.employeeSize && !lead.employeeSize.toLowerCase().includes('unknown') && <span>{lead.employeeSize} employees</span>}
+              {lead.location && <span>{lead.location}</span>}
+              {lead.website && (
+                <a href={`https://${lead.website}`} target="_blank" rel="noopener noreferrer"
+                   className="text-lewisco-600 hover:underline">{lead.website}</a>
+              )}
+            </div>
+
+
+            {(lead.contactName || lead.contactEmail) && (
+              <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-slate-600">
+                {lead.contactName && <span>👤 {lead.contactName}</span>}
+                {lead.contactEmail && <span>✉ {lead.contactEmail}</span>}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Controls */}
+        <div className="flex flex-shrink-0 items-center gap-2">
+          <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Mark contacted">
+            <input type="checkbox" checked={isContacted}
+              onChange={() => onContact(lead.id)}
+              className="w-4 h-4 accent-emerald-600 cursor-pointer" />
+            <span className="text-xs text-slate-500 hidden sm:inline">Contacted</span>
+          </label>
+
+          {isDismissed ? (
+            <button onClick={() => onUndoDismiss(lead.id)}
+              className="rounded px-2 py-1 text-xs font-medium text-red-600 border border-red-300 hover:bg-red-50 transition">
+              Undo
+            </button>
+          ) : (
+            <button onClick={() => onDismiss(lead.id)}
+              className="rounded px-2 py-1 text-xs font-medium text-slate-400 border border-slate-200 hover:border-red-300 hover:text-red-500 transition"
+              title="Dismiss">
+              ✕
+            </button>
+          )}
+
+          <a
+            href="https://crm.zoho.com/crm/org695870911/tab/Vendors"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded px-2 py-1 text-xs font-medium text-blue-600 border border-blue-300 hover:bg-blue-50 transition">
+            + Zoho
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}

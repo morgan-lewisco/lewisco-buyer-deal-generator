@@ -1,0 +1,83 @@
+import { BuyerProfile } from './types';
+
+export const DEFAULT_BUYERS: BuyerProfile[] = [
+  {
+    id: 'dewey',
+    name: 'Dewey',
+    bio: 'Company top earner, focused on branded food and beverage closeouts. Natural drinks, snacks, candy, canned seafood, and Mediterranean pantry imports.',
+    badge: { label: 'Top Earner', color: 'amber', emoji: '⭐' },
+    zohoOwnerName: 'Dewey Yeager',
+    lanes: [
+      'branded CPG food & beverage',
+      'functional & natural beverages',
+      'snacks & candy',
+      'canned seafood',
+      'Mediterranean/pantry imports',
+    ],
+    categories: ['Beverages', 'Snacks', 'Candy', 'Canned Seafood', 'Pantry', 'Pet Food'],
+    seedVendors: [
+      'Poppi', 'Talking Rain', 'Wild Planet', 'StarKist', 'Lotus Bakeries',
+      'Danone', 'Feastables', 'Roar Organic', 'Ziyad', 'Vigo', 'Star Fine Foods',
+    ],
+    revenueBand: { min: 5_000_000, max: 750_000_000 },
+    geographies: ['US'],
+    signalEvents: [
+      { type: 'merger_acquisition', weight: 0.9 },
+      { type: 'divestiture', weight: 0.95 },
+      { type: 'plant_closure', weight: 1.0 },
+      { type: 'layoffs', weight: 0.85 },
+      { type: 'facility_relocation', weight: 0.8 },
+    ],
+    scoringWeights: { fit: 0.45, signal: 0.55 },
+  },
+
+  // ── Igor ──────────────────────────────────────────────────────────────────
+  // Broad opportunistic closeout buyer. Signal stream weighted higher than Dewey.
+  // Restoration Wireless excluded from seeds — non-food closeout trader.
+  {
+    id: 'igor',
+    name: 'Igor',
+    bio: 'High-volume opportunistic buyer spanning beverages, snacks, sports nutrition, canned grocery, and specialty imports. Broadest lane coverage on the team.',
+    badge: { label: 'All-In Buyer', color: 'blue', emoji: '🌊' },
+    zohoOwnerName: 'Igor Vega',
+    lanes: [
+      'beverages (juice, functional soda, water, coffee, energy)',
+      'salty snacks, popcorn, candy & cookies',
+      'sports nutrition & supplements',
+      'canned & shelf-stable grocery',
+      'Hispanic / international / specialty imports',
+      'sweeteners, baking & dairy',
+      'better-for-you condiments & pantry',
+    ],
+    categories: [
+      'Beverages', 'Snacks', 'Candy', 'Sports Nutrition',
+      'Canned Grocery', 'Dairy', 'Condiments', 'Pantry', 'International Foods',
+    ],
+    seedVendors: [
+      'UTZ Quality Foods',    // anchor — 355 deals
+      'Lassonde Pappas',      // juice & drinks
+      'World Finer Foods',    // pasta / specialty imports
+      'Olipop',               // functional soda
+      'Medallion Foods',      // tortilla / snack chips
+      'Zevia',                // zero-sugar soda
+      'Nutrabolt',            // sports nutrition / C4 energy
+      'Heartland',            // sweeteners / Splenda
+      'Liquid Death',         // water
+      'Vilore Foods',         // Hispanic foods & beverages / Klass
+      'Fat and Weird Cookie', // cookies / snacks
+      'Primal Kitchen',       // better-for-you condiments
+      'HP Hood',              // dairy
+      'Fremont Company',      // canned tomatoes / kraut
+    ],
+    revenueBand: { min: 5_000_000, max: 2_000_000_000 },
+    geographies: ['US'],
+    signalEvents: [
+      { type: 'merger_acquisition', weight: 0.9 },
+      { type: 'divestiture', weight: 0.95 },
+      { type: 'plant_closure', weight: 1.0 },
+      { type: 'layoffs', weight: 0.85 },
+      { type: 'facility_relocation', weight: 0.8 },
+    ],
+    scoringWeights: { fit: 0.45, signal: 0.55 },
+  },
+];
