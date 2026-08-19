@@ -43,34 +43,47 @@ async function getAccessToken(): Promise<string> {
  * Returns an empty Set on any error so the engine continues gracefully.
  */
 /**
- * Returns a Set of lowercased vendor names already owned by this buyer in Zoho.
- * Filters by Owner.name (e.g. "Dewey Yeager") — the exact name from Zoho CRM.
+ * Returns a Set of lowercased vendor names already in Zoho — all owners.
+ * Any company already in the system is excluded as a lead, regardless of
+ * which buyer owns them.
  * Returns an empty Set on any error so the engine continues gracefully.
  */
-export async function getExistingVendorNames(zohoOwnerName: string): Promise<Set<string>> {
+export async function getExistingVendorNames(_zohoOwnerName: string): Promise<Set<string>> {
   try {
     const token = await getAccessToken();
 
-    const params = new URLSearchParams({
-      fields: 'Vendor_Name,Owner',
-      criteria: `(Owner.name:equals:${zohoOwnerName})`,
-      per_page: '200',
-    });
+    // Fetch all vendors across all owners, paginating up to 1000 records
+    const allNames = new Set<string>();
+    for (let page = 1; page <= 5; page++) {
+      const params = new URLSearchParams({
+        fields: 'Vendor_Name',
+        per_page: '200',
+        page: String(page),
+      });
 
-    const res = await fetch(`https://www.zohoapis.com/crm/v3/Vendors?${params}`, {
-      headers: { Authorization: `Zoho-oauthtoken ${token}` },
-      signal: AbortSignal.timeout(10_000),
-    });
+      const res = await fetch(`https://www.zohoapis.com/crm/v3/Vendors?${params}`, {
+        headers: { Authorization: `Zoho-oauthtoken ${token}` },
+        signal: AbortSignal.timeout(10_000),
+      });
 
-    if (!res.ok) {
-      console.warn('[zoho-dedup] Vendors query failed:', res.status);
-      return new Set();
+      if (!res.ok) {
+        console.warn('[zoho-dedup] Vendors query failed:', res.status);
+        break;
+      }
+
+      const data = await res.json();
+      const vendors: Array<{ Vendor_Name?: string }> = data.data ?? [];
+      for (const v of vendors) {
+        const name = (v.Vendor_Name ?? '').toLowerCase().trim();
+        if (name) allNames.add(name);
+      }
+
+      // Stop paginating if this page was not full
+      if (vendors.length < 200) break;
     }
-    const data = await res.json();
-    const vendors: Array<{ Vendor_Name?: string }> = data.data ?? [];
-    const names = new Set(vendors.map((v) => (v.Vendor_Name ?? '').toLowerCase().trim()));
-    console.log(`[zoho-dedup] ${names.size} existing vendors found for ${zohoOwnerName}`);
-    return names;
+
+    console.log(`[zoho-dedup] ${allNames.size} total existing vendors found in Zoho`);
+    return allNames;
   } catch {
     console.warn('[zoho-dedup] Skipping dedup — Zoho unavailable or not configured');
     return new Set();
