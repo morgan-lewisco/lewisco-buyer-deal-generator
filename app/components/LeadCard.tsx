@@ -135,7 +135,7 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
               {lead.contactEmail && <span className="text-slate-600">✉ {lead.contactEmail}</span>}
               {lead.contactPhone && <span className="text-slate-600">📞 {lead.contactPhone}</span>}
               <a
-                href={`https://app.zoominfo.com/#/apps/search/v2/person/results?companyName=${encodeURIComponent(lead.company)}`}
+                href={`https://app.zoominfo.com/#/apps/search/v2/person/results?employerName=${encodeURIComponent(lead.company)}${lead.website ? `&companyWebsite=${encodeURIComponent(lead.website)}` : ''}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition"
