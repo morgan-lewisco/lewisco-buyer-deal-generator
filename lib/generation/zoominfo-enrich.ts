@@ -117,33 +117,49 @@ interface ZIContact {
   jobTitle?: string;
 }
 
+// Strip common legal suffixes to improve ZoomInfo match rate
+const SUFFIX_RE = /\b(llc|inc|corp|co|ltd|foods|food|company|brands|group|international|enterprises|industries)\b\.?$/i;
+
+function nameVariants(name: string): string[] {
+  const clean = (s: string) => s.replace(/[,.\s]+$/, '').trim();
+  const variants = [name];
+  const stripped = clean(name.replace(SUFFIX_RE, ''));
+  if (stripped && stripped !== name) variants.push(stripped);
+  // Also try removing everything after a comma or parenthesis (e.g. "Acme Foods, Inc.")
+  const beforeComma = clean(name.split(/[,(]/)[0]);
+  if (beforeComma && beforeComma !== name && beforeComma !== stripped) variants.push(beforeComma);
+  return [...new Set(variants)];
+}
+
+async function searchContacts(token: string, companyName: string): Promise<ZIContact[]> {
+  const res = await fetch(`${BASE}/gtm/data/v1/contacts/search`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/vnd.api+json',
+      'Accept':       'application/vnd.api+json',
+      'Authorization': `Bearer ${token}`,
+      'User-Agent':   USER_AGENT,
+    },
+    body: JSON.stringify({ data: { type: 'ContactSearch', attributes: { companyName } } }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.data ?? []).map((item: { id?: string | number; attributes?: ZIContact }) => ({
+    id:        item.id,
+    firstName: item.attributes?.firstName,
+    lastName:  item.attributes?.lastName,
+    jobTitle:  item.attributes?.jobTitle,
+  }));
+}
+
 async function fetchTopContact(token: string, companyName: string): Promise<{ name?: string; title?: string; ziId?: string } | null> {
   try {
-    const res = await fetch(`${BASE}/gtm/data/v1/contacts/search`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/vnd.api+json',
-        'Accept':       'application/vnd.api+json',
-        'Authorization': `Bearer ${token}`,
-        'User-Agent':   USER_AGENT,
-      },
-      body: JSON.stringify({
-        data: {
-          type: 'ContactSearch',
-          attributes: { companyName },
-        },
-      }),
-    });
-
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    const contacts: ZIContact[] = (data.data ?? []).map((item: { id?: string | number; attributes?: ZIContact }) => ({
-      id:        item.id,
-      firstName: item.attributes?.firstName,
-      lastName:  item.attributes?.lastName,
-      jobTitle:  item.attributes?.jobTitle,
-    }));
+    // Try original name first, then progressively stripped variants
+    let contacts: ZIContact[] = [];
+    for (const variant of nameVariants(companyName)) {
+      contacts = await searchContacts(token, variant);
+      if (contacts.length > 0) break;
+    }
 
     if (contacts.length === 0) return null;
 
