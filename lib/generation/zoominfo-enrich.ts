@@ -58,33 +58,69 @@ async function getAccessToken(): Promise<string | null> {
   }
 }
 
-// Role relevance — higher index wins. Broad 'sales' is low so it doesn't
-// override specific high-value titles.
+// Role relevance — ranked lowest to highest priority (last match wins).
 const ROLE_PRIORITY = [
-  // Last resort — any C-suite beats nothing
-  'ceo', 'chief executive', 'coo', 'chief operating', 'cfo', 'chief financial',
-  'president', 'owner', 'founder',
-  // Ops / supply chain — secondary
-  'supply chain', 'logistics', 'procurement', 'purchasing', 'inventory',
-  // Broad sales — catch-all but overridden by specific titles below
-  'sales',
-  // Commercial
-  'trade marketing', 'category management', 'channel', 'national accounts',
-  'key accounts', 'account management', 'business development',
-  // Sales leadership — top priority
-  'sales operations', 'director of sales', 'sales director',
-  'vp of sales', 'vp sales', 'vice president of sales', 'vice president sales',
-  'svp of sales', 'svp sales', 'chief sales', 'chief revenue', 'cro',
-  'head of sales', 'head of revenue', 'general manager sales',
+  // ── Finance (last resort)
+  'controller', 'vp of finance', 'director of financial planning', 'cfo', 'chief financial',
+
+  // ── Executive / owner (good for small brands)
+  'managing partner', 'partner', 'principal', 'general manager',
+  'managing director', 'co-founder', 'founder', 'owner',
+  'president', 'ceo', 'chief executive',
+
+  // ── Supply chain / inventory (influencers who flag what needs to move)
+  'warehouse', 'distribution manager', 'logistics manager',
+  'materials manager', 'commodity manager', 'supply manager', 'vendor manager', 'supplier manager',
+  'demand planning', 's&op', 'inventory control', 'inventory manager',
+  'director of operations', 'supply chain manager',
+  'vp of supply chain', 'director of supply chain',
+
+  // ── Retail / CPG buying & merchandising
+  'assistant buyer', 'merchandise planner', 'merchandising manager',
+  'category buyer', 'senior buyer', 'buyer',
+  'divisional merchandise manager', 'dmm', 'general merchandise manager', 'gmm',
+  'vp of merchandising', 'director of merchandising',
+  'category manager', 'director of category management',
+
+  // ── Procurement / purchasing
+  'purchasing agent', 'purchasing manager', 'procurement manager',
+  'sourcing manager', 'category sourcing', 'strategic sourcing',
+  'director of purchasing', 'director of procurement',
+  'vp of purchasing', 'vp of procurement',
+  'chief procurement', 'cpo',
+
+  // ── General sales
+  'account executive', 'sales manager', 'sales operations manager',
+  'regional sales manager', 'regional sales director',
+  'key account manager', 'national account manager', 'director of national accounts',
+  'channel manager', 'commercial director',
+  'business development manager', 'business development director',
+  'vp business development', 'head of trade', 'director of trade sales',
+  'head of sales', 'director of sales', 'sales director',
+  'national sales manager',
+  'vp sales & marketing', 'vp of sales', 'vp sales', 'vice president of sales', 'vice president sales',
+  'svp sales', 'svp of sales', 'evp sales', 'evp of sales',
+  'chief sales', 'chief commercial', 'cco',
+  'chief revenue', 'cro',
+
+  // ── Closeout / excess-inventory specific — HIGHEST PRIORITY
+  'salvage sales', 'overstock manager', 'deal manager', 'broker manager', 'special markets',
+  'discount channel', 'value channel', 'liquidation specialist',
+  'excess & obsolete', 'e&o inventory', 'inventory liquidation',
+  'liquidation manager', 'alternative channel', 'secondary channel',
+  'off-price sales', 'closeout sales', 'director of closeouts',
+  'vp of closeouts', 'manager of closeouts',
 ];
 
-// Seniority — tiebreaker when role priority is equal
+// Seniority — tiebreaker when role bands are equal
 const SENIORITY = [
-  'representative', 'associate', 'coordinator', 'analyst', 'specialist',
+  'agent', 'representative', 'associate', 'coordinator', 'analyst', 'specialist', 'planner',
+  'assistant', 'executive',
   'manager', 'senior manager',
   'director', 'senior director',
   'vp', 'vice president', 'svp', 'senior vice president', 'evp', 'executive vice president',
-  'chief', 'president', 'ceo', 'coo', 'cfo', 'cro', 'owner', 'founder',
+  'chief', 'president', 'ceo', 'coo', 'cfo', 'cro', 'cco', 'cpo',
+  'owner', 'founder', 'partner',
 ];
 
 function roleScore(title: string): number {
@@ -106,7 +142,7 @@ function seniorityScore(title: string): number {
 }
 
 function titleScore(title: string): number {
-  // Composite: role relevance is primary (×100), seniority breaks ties
+  // Role relevance is primary (×100), seniority breaks ties within the same band
   return roleScore(title) * 100 + seniorityScore(title);
 }
 
