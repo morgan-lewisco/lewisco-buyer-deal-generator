@@ -1,4 +1,5 @@
 'use client';
+import { useState } from 'react';
 import { Lead, LeadStatus } from '@/lib/types';
 import { BUYER_NAMES } from '@/lib/buyers';
 
@@ -9,6 +10,7 @@ interface Props {
   onDismiss: (id: string) => void;
   onUndoDismiss: (id: string) => void;
   onAssign: (id: string, name: string) => void;
+  onDeal: (id: string, dealMade: boolean, dealNotes: string) => void;
 }
 
 const SIGNAL_CONFIG: Record<string, { label: string; className: string }> = {
@@ -42,15 +44,18 @@ function categoryClass(cat: string): string {
 }
 
 
-export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign }: Props) {
+export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign, onDeal }: Props) {
   const isContacted = lead.status === 'contacted';
   const isDismissed = lead.status === 'dismissed';
+  const [showDealForm, setShowDealForm] = useState(false);
+  const [draftNotes, setDraftNotes]     = useState(lead.dealNotes ?? '');
 
   const cardClass = [
     'rounded-lg border p-4 transition-all',
-    isContacted  ? 'border-emerald-200 bg-emerald-50/40' : '',
-    isDismissed  ? 'border-red-200 bg-red-50/30 opacity-70' : '',
-    !isContacted && !isDismissed ? 'border-slate-200 bg-white' : '',
+    lead.dealMade ? 'border-yellow-300 bg-yellow-50/40' : '',
+    !lead.dealMade && isContacted  ? 'border-emerald-200 bg-emerald-50/40' : '',
+    !lead.dealMade && isDismissed  ? 'border-red-200 bg-red-50/30 opacity-70' : '',
+    !lead.dealMade && !isContacted && !isDismissed ? 'border-slate-200 bg-white' : '',
   ].join(' ');
 
   const titleClass = [
@@ -76,7 +81,10 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
               ) : (
                 <span className={titleClass}>{lead.company}</span>
               )}
-              {isContacted && (
+              {lead.dealMade && (
+                <span className="text-xs font-medium text-yellow-800 bg-yellow-200 rounded-full px-2 py-0.5">🤝 Deal Made</span>
+              )}
+              {isContacted && !lead.dealMade && (
                 <span className="text-xs font-medium text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">✓ Contacted</span>
               )}
               {isDismissed && (
@@ -131,6 +139,46 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
               )}
             </div>
 
+
+            {/* Deal notes */}
+            {lead.dealMade && lead.dealNotes && (
+              <p className="mt-2 text-xs text-yellow-800 bg-yellow-100 border border-yellow-200 rounded px-2 py-1.5">
+                <span className="font-semibold">Deal: </span>{lead.dealNotes}
+              </p>
+            )}
+
+            {/* Deal notes form */}
+            {showDealForm && (
+              <div className="mt-2 space-y-1.5">
+                <textarea
+                  value={draftNotes}
+                  onChange={(e) => setDraftNotes(e.target.value)}
+                  placeholder="Brief description of the deal (product, quantity, price, etc.)"
+                  rows={2}
+                  autoFocus
+                  className="w-full rounded border border-yellow-300 bg-white px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-yellow-400 resize-none"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { onDeal(lead.id, true, draftNotes); setShowDealForm(false); }}
+                    className="rounded px-3 py-1 text-xs font-semibold bg-yellow-400 hover:bg-yellow-300 text-yellow-900 transition">
+                    Save Deal
+                  </button>
+                  <button
+                    onClick={() => setShowDealForm(false)}
+                    className="rounded px-3 py-1 text-xs font-medium text-slate-500 hover:text-slate-700 transition">
+                    Cancel
+                  </button>
+                  {lead.dealMade && (
+                    <button
+                      onClick={() => { onDeal(lead.id, false, ''); setShowDealForm(false); }}
+                      className="ml-auto rounded px-3 py-1 text-xs font-medium text-red-500 hover:text-red-700 transition">
+                      Remove Deal
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* ZoomInfo contact row */}
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
@@ -189,6 +237,16 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
           </select>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setDraftNotes(lead.dealNotes ?? ''); setShowDealForm((v) => !v); }}
+              className={`rounded px-2 py-1 text-xs font-semibold border transition ${
+                lead.dealMade
+                  ? 'bg-yellow-200 text-yellow-800 border-yellow-300 hover:bg-yellow-100'
+                  : 'bg-white text-slate-500 border-slate-200 hover:border-yellow-400 hover:text-yellow-700'
+              }`}
+              title="Mark as deal made">
+              🤝 Deal
+            </button>
             <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Mark contacted">
               <input type="checkbox" checked={isContacted}
                 onChange={() => onContact(lead.id)}

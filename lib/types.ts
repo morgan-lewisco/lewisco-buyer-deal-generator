@@ -27,6 +27,8 @@ export interface Lead {
   sourceUrl?: string;
   status: LeadStatus;
   assignedTo?: AssignedTo;
+  dealMade?: boolean;
+  dealNotes?: string;
 }
 
 export interface SignalEvent {

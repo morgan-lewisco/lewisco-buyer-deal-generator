@@ -110,3 +110,9 @@ export function updateLeadStatus(leads: Lead[], id: string, status: LeadStatus):
 export function updateLeadAssignment(leads: Lead[], id: string, assignedTo: string): Lead[] {
   return leads.map((l) => (l.id === id ? { ...l, assignedTo: assignedTo || undefined } : l));
 }
+
+export function updateLeadDeal(leads: Lead[], id: string, dealMade: boolean, dealNotes: string): Lead[] {
+  return leads.map((l) =>
+    l.id === id ? { ...l, dealMade, dealNotes: dealNotes || undefined } : l
+  );
+}

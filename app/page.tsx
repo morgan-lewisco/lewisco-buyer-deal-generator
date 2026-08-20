@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Lead, LeadStatus } from '@/lib/types';
 import { BUYER_NAMES } from '@/lib/buyers';
-import { accumulateLeads, updateLeadStatus, updateLeadAssignment } from '@/lib/persistence';
+import { accumulateLeads, updateLeadStatus, updateLeadAssignment, updateLeadDeal } from '@/lib/persistence';
 import LeadList from './components/LeadList';
 import AddLeadModal from './components/AddLeadModal';
 
@@ -98,6 +98,14 @@ export default function AdminPage() {
     });
   }, [generatedAt, persistPool]);
 
+  const handleDeal = useCallback((id: string, dealMade: boolean, dealNotes: string) => {
+    setLeads((prev) => {
+      const next = updateLeadDeal(prev, id, dealMade, dealNotes);
+      persistPool(next, generatedAt);
+      return next;
+    });
+  }, [generatedAt, persistPool]);
+
   const handleAssign = useCallback((id: string, name: string) => {
     setLeads((prev) => {
       const next = updateLeadAssignment(prev, id, name);
@@ -133,6 +141,7 @@ export default function AdminPage() {
   const assignedCount   = leads.filter((l) => l.assignedTo).length;
   const contactedCount  = leads.filter((l) => l.status === 'contacted').length;
   const unassignedCount = leads.filter((l) => !l.assignedTo && l.status !== 'contacted').length;
+  const dealCount       = leads.filter((l) => l.dealMade).length;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -184,12 +193,13 @@ export default function AdminPage() {
       <main className="mx-auto max-w-5xl px-4 py-6">
         {/* Stats bar */}
         {totalLeads > 0 && (
-          <div className="mb-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="mb-5 grid grid-cols-2 sm:grid-cols-5 gap-3">
             {[
               { label: 'Total Leads',  value: totalLeads,      color: 'text-slate-900' },
               { label: 'Unassigned',   value: unassignedCount, color: 'text-amber-700' },
               { label: 'Assigned',     value: assignedCount,   color: 'text-lewisco-700' },
               { label: 'Contacted',    value: contactedCount,  color: 'text-emerald-700' },
+              { label: 'Deals Made',   value: dealCount,       color: 'text-yellow-700' },
             ].map(({ label, value, color }) => (
               <div key={label} className="rounded-xl bg-white border border-slate-200 px-4 py-3 shadow-sm text-center">
                 <div className={`text-2xl font-bold ${color}`}>{value}</div>
@@ -268,6 +278,7 @@ export default function AdminPage() {
             leads={leads}
             onUpdateStatus={handleUpdateStatus}
             onAssign={handleAssign}
+            onDeal={handleDeal}
             onGenerate={handleGenerate}
             isLoading={isLoading}
             genLabel={STATUS_LABEL[status]}

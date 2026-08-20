@@ -11,12 +11,13 @@ interface Props {
   leads: Lead[];
   onUpdateStatus: (id: string, status: LeadStatus) => void;
   onAssign: (id: string, name: string) => void;
+  onDeal: (id: string, dealMade: boolean, dealNotes: string) => void;
   onGenerate: () => void;
   isLoading: boolean;
   genLabel: string;
 }
 
-export default function LeadList({ leads, onUpdateStatus, onAssign, onGenerate, isLoading, genLabel }: Props) {
+export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGenerate, isLoading, genLabel }: Props) {
   const [filterTab, setFilterTab]     = useState<FilterTab>('all');
   const [statusTab, setStatusTab]     = useState<StatusTab>('active');
   const [showDismissed, setShowDismissed] = useState(true);
@@ -122,7 +123,7 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onGenerate, 
           {visible.map((lead, i) => (
             <LeadCard key={lead.id} lead={lead} rank={i + 1}
               onContact={handleContact} onDismiss={handleDismiss}
-              onUndoDismiss={handleUndoDismiss} onAssign={onAssign} />
+              onUndoDismiss={handleUndoDismiss} onAssign={onAssign} onDeal={onDeal} />
           ))}
         </div>
       )}
