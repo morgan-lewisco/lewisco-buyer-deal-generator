@@ -1,4 +1,5 @@
 export type LeadStatus = 'new' | 'contacted' | 'dismissed';
+export type AssignedTo = string; // buyer manager name, e.g. "Dewey Yeager"
 export type LeadType = 'both' | 'lookalike' | 'signal';
 
 export interface Lead {
@@ -20,10 +21,12 @@ export interface Lead {
   contactEmail?: string;
   contactPhone?: string;
   zoomInfoId?: string;
+  parentCompany?: string;
   source: string;
   leadType?: LeadType;
   sourceUrl?: string;
   status: LeadStatus;
+  assignedTo?: AssignedTo;
 }
 
 export interface SignalEvent {
@@ -66,6 +69,11 @@ export interface BuyerState {
   leads: Lead[];
   generatedAt: string | null;
   statusOverrides: Record<string, LeadStatus>;
+}
+
+export interface PoolState {
+  leads: Lead[];
+  generatedAt: string | null;
 }
 
 export interface GenerateResult {

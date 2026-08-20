@@ -1,5 +1,6 @@
 'use client';
 import { Lead, LeadStatus } from '@/lib/types';
+import { BUYER_NAMES } from '@/lib/buyers';
 
 interface Props {
   lead: Lead;
@@ -7,6 +8,7 @@ interface Props {
   onContact: (id: string) => void;
   onDismiss: (id: string) => void;
   onUndoDismiss: (id: string) => void;
+  onAssign: (id: string, name: string) => void;
 }
 
 const SIGNAL_CONFIG: Record<string, { label: string; className: string }> = {
@@ -40,7 +42,7 @@ function categoryClass(cat: string): string {
 }
 
 
-export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss }: Props) {
+export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign }: Props) {
   const isContacted = lead.status === 'contacted';
   const isDismissed = lead.status === 'dismissed';
 
@@ -81,6 +83,12 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
                 <span className="text-xs font-medium text-red-700 bg-red-100 rounded-full px-2 py-0.5">Dismissed</span>
               )}
             </div>
+
+            {lead.parentCompany && (
+              <p className="text-xs text-slate-400 mt-0.5">
+                a <span className="font-medium text-slate-500">{lead.parentCompany}</span> brand
+              </p>
+            )}
 
             <div className="flex flex-wrap gap-1.5 mt-1.5">
               <span className={`inline-flex items-center rounded px-2 py-0.5 text-xs font-medium ${categoryClass(lead.category)}`}>
@@ -135,7 +143,11 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
               {lead.contactEmail && <span className="text-slate-600">✉ {lead.contactEmail}</span>}
               {lead.contactPhone && <span className="text-slate-600">📞 {lead.contactPhone}</span>}
               <a
-                href={`https://app.zoominfo.com/#/apps/search/v2/person/results?employerName=${encodeURIComponent(lead.company)}${lead.website ? `&companyWebsite=${encodeURIComponent(lead.website)}` : ''}`}
+                href={
+                  lead.zoomInfoId
+                    ? `https://app.zoominfo.com/#/apps/profile/person/${lead.zoomInfoId}/overview`
+                    : `https://app.zoominfo.com/#/apps/home-page?employerName=${encodeURIComponent(lead.company)}${lead.website ? `&companyWebsite=${encodeURIComponent(lead.website)}` : ''}`
+                }
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition"
@@ -159,34 +171,52 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
         </div>
 
         {/* Controls */}
-        <div className="flex flex-shrink-0 items-center gap-2">
-          <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Mark contacted">
-            <input type="checkbox" checked={isContacted}
-              onChange={() => onContact(lead.id)}
-              className="w-4 h-4 accent-emerald-600 cursor-pointer" />
-            <span className="text-xs text-slate-500 hidden sm:inline">Contacted</span>
-          </label>
+        <div className="flex flex-shrink-0 flex-col items-end gap-2">
+          {/* Assignment dropdown */}
+          <select
+            value={lead.assignedTo ?? ''}
+            onChange={(e) => onAssign(lead.id, e.target.value)}
+            className={`rounded border px-2 py-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-lewisco-400 ${
+              lead.assignedTo
+                ? 'border-lewisco-300 bg-lewisco-50 text-lewisco-800'
+                : 'border-slate-200 bg-white text-slate-400'
+            }`}
+          >
+            <option value="">Unassigned</option>
+            {BUYER_NAMES.map((name) => (
+              <option key={name} value={name}>{name}</option>
+            ))}
+          </select>
 
-          {isDismissed ? (
-            <button onClick={() => onUndoDismiss(lead.id)}
-              className="rounded px-2 py-1 text-xs font-medium text-red-600 border border-red-300 hover:bg-red-50 transition">
-              Undo
-            </button>
-          ) : (
-            <button onClick={() => onDismiss(lead.id)}
-              className="rounded px-2 py-1 text-xs font-medium text-slate-400 border border-slate-200 hover:border-red-300 hover:text-red-500 transition"
-              title="Dismiss">
-              ✕
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Mark contacted">
+              <input type="checkbox" checked={isContacted}
+                onChange={() => onContact(lead.id)}
+                className="w-4 h-4 accent-emerald-600 cursor-pointer" />
+              <span className="text-xs text-slate-500 hidden sm:inline">Contacted</span>
+            </label>
 
-          <a
-            href="https://crm.zoho.com/crm/org695870911/tab/Vendors"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded px-2 py-1 text-xs font-medium text-blue-600 border border-blue-300 hover:bg-blue-50 transition">
-            + Zoho
-          </a>
+            {isDismissed ? (
+              <button onClick={() => onUndoDismiss(lead.id)}
+                className="rounded px-2 py-1 text-xs font-medium text-red-600 border border-red-300 hover:bg-red-50 transition">
+                Undo
+              </button>
+            ) : (
+              <button onClick={() => onDismiss(lead.id)}
+                className="rounded px-2 py-1 text-xs font-medium text-slate-400 border border-slate-200 hover:border-red-300 hover:text-red-500 transition"
+                title="Dismiss">
+                ✕
+              </button>
+            )}
+
+            <a
+              href="https://crm.zoho.com/crm/org695870911/tab/Vendors"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded px-2 py-1 text-xs font-medium text-blue-600 border border-blue-300 hover:bg-blue-50 transition">
+              + Zoho
+            </a>
+          </div>
         </div>
       </div>
     </div>

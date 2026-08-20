@@ -1,120 +1,112 @@
-import { BuyerState, Lead, LeadStatus } from './types';
+import { Lead, LeadStatus, PoolState } from './types';
 
-const storageKey = (buyerId: string) => `bdg-live:buyer:${buyerId}`;
+const POOL_KEY = 'bdg-live:pool';
 
-// ── Cross-buyer claims ─────────────────────────────────────────────────────
-// Shared key: { normalizedCompany → buyerId }
-// Marking a lead contacted claims it; un-contacting releases it.
-const CLAIMS_KEY = 'bdg-live:claims';
-const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+const norm = (s: string) => s.toLowerCase().trim();
 
-function getClaims(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(CLAIMS_KEY) ?? '{}'); }
-  catch { return {}; }
-}
-
-export function claimLead(buyerId: string, company: string): void {
-  const claims = getClaims();
-  claims[normalize(company)] = buyerId;
-  localStorage.setItem(CLAIMS_KEY, JSON.stringify(claims));
-}
-
-export function releaseLead(company: string): void {
-  const claims = getClaims();
-  delete claims[normalize(company)];
-  localStorage.setItem(CLAIMS_KEY, JSON.stringify(claims));
-}
-
-/** Filter out leads claimed by a different buyer. Claimer keeps their own. */
-export function filterClaimedByOthers(buyerId: string, leads: Lead[]): Lead[] {
-  const claims = getClaims();
-  return leads.filter((l) => {
-    const claimedBy = claims[normalize(l.zoomInfoId ?? l.company)];
-    return !claimedBy || claimedBy === buyerId;
+/**
+ * Remove parent-company duplicates from a lead list.
+ * If a subsidiary lead exists (has parentCompany set), drop any standalone lead
+ * whose company name matches that parent.
+ * Also collapse "Parent / Child" slash names to the child brand.
+ * Finally, deduplicate by normalized company name keeping highest blendedScore.
+ */
+export function deduplicateLeads(leads: Lead[]): Lead[] {
+  // Step 1: resolve slash-format company names → use rightmost token as brand
+  const resolved = leads.map((l) => {
+    if (l.company.includes('/')) {
+      const parts = l.company.split('/').map((p) => p.trim()).filter(Boolean);
+      const child  = parts[parts.length - 1];
+      const parent = parts.length > 1 ? parts[0] : l.parentCompany;
+      return { ...l, company: child, parentCompany: l.parentCompany || parent };
+    }
+    return l;
   });
+
+  // Step 2: collect parent names referenced by subsidiary leads
+  const parentNames = new Set(
+    resolved.filter((l) => l.parentCompany).map((l) => norm(l.parentCompany!))
+  );
+  const subsidiaryNames = new Set(
+    resolved.filter((l) => l.parentCompany).map((l) => norm(l.company))
+  );
+
+  // Step 3: drop a lead if its company is a known parent of another lead in the pool
+  const withoutParents = resolved.filter((l) => {
+    const isParentOfAnother = parentNames.has(norm(l.company)) && !subsidiaryNames.has(norm(l.company));
+    return !isParentOfAnother;
+  });
+
+  // Step 4: deduplicate by normalized company name, keep highest blendedScore
+  const byCompany = new Map<string, Lead>();
+  for (const l of withoutParents) {
+    const key = norm(l.company);
+    const existing = byCompany.get(key);
+    if (!existing || l.blendedScore > existing.blendedScore) byCompany.set(key, l);
+  }
+
+  return [...byCompany.values()].sort((a, b) => b.blendedScore - a.blendedScore);
 }
 
-export function loadBuyerState(buyerId: string): BuyerState {
-  if (typeof window === 'undefined') return emptyState();
+export function loadPoolState(): PoolState {
+  if (typeof window === 'undefined') return { leads: [], generatedAt: null };
   try {
-    const raw = localStorage.getItem(storageKey(buyerId));
-    if (!raw) return emptyState();
-    return JSON.parse(raw) as BuyerState;
+    const raw = localStorage.getItem(POOL_KEY);
+    if (!raw) return { leads: [], generatedAt: null };
+    return JSON.parse(raw) as PoolState;
   } catch {
-    return emptyState();
+    return { leads: [], generatedAt: null };
   }
 }
 
-export function saveBuyerState(buyerId: string, state: BuyerState): void {
+export function savePoolState(state: PoolState): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(storageKey(buyerId), JSON.stringify(state));
+  localStorage.setItem(POOL_KEY, JSON.stringify(state));
 }
 
-export function mergeLeads(fresh: Lead[], overrides: Record<string, LeadStatus>): Lead[] {
-  return fresh.map((lead) => {
-    const key = lead.zoomInfoId ?? lead.company;
-    const saved = overrides[key];
-    return saved ? { ...lead, status: saved } : lead;
-  });
+export function clearPoolState(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(POOL_KEY);
 }
 
 /**
- * Accumulate fresh leads into an existing list.
- * Existing leads are never removed. New companies are appended.
- * Statuses (contacted/dismissed) are preserved on both sides.
- * ZoomInfo enrichment fields (contactName, contactTitle, zoomInfoId) are
- * always updated from the fresh batch so contact data stays current.
- * Result is sorted best-score-first.
+ * Merge fresh leads into the existing pool.
+ * - Existing leads keep their status, assignedTo, and ZoomInfo enrichment.
+ * - Fresh runs update ZoomInfo contact fields on existing leads.
+ * - New companies are appended.
+ * - Result sorted best-score-first.
  */
-export function accumulateLeads(
-  existing: Lead[],
-  fresh: Lead[],
-  overrides: Record<string, LeadStatus>
-): Lead[] {
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+export function accumulateLeads(existing: Lead[], fresh: Lead[]): Lead[] {
+  const key = (l: Lead) => norm(l.zoomInfoId ?? l.company).replace(/[^a-z0-9]/g, '');
 
-  // Build a lookup of fresh leads by normalized key
   const freshByKey = new Map<string, Lead>();
-  for (const l of fresh) freshByKey.set(norm(l.zoomInfoId ?? l.company), l);
+  for (const l of fresh) freshByKey.set(key(l), l);
 
-  // Update existing leads with fresh ZoomInfo enrichment
   const updated = existing.map((l) => {
-    const freshLead = freshByKey.get(norm(l.zoomInfoId ?? l.company));
+    const freshLead = freshByKey.get(key(l));
     if (!freshLead) return l;
     return {
       ...l,
-      contactName:  freshLead.contactName  ?? l.contactName,
-      contactTitle: freshLead.contactTitle ?? l.contactTitle,
-      contactEmail: freshLead.contactEmail ?? l.contactEmail,
-      contactPhone: freshLead.contactPhone ?? l.contactPhone,
-      zoomInfoId:   freshLead.zoomInfoId   ?? l.zoomInfoId,
+      contactName:   freshLead.contactName   ?? l.contactName,
+      contactTitle:  freshLead.contactTitle  ?? l.contactTitle,
+      contactEmail:  freshLead.contactEmail  ?? l.contactEmail,
+      contactPhone:  freshLead.contactPhone  ?? l.contactPhone,
+      zoomInfoId:    freshLead.zoomInfoId    ?? l.zoomInfoId,
+      parentCompany: freshLead.parentCompany ?? l.parentCompany,
     };
   });
 
-  // Append genuinely new companies
-  const existingKeys = new Set(existing.map((l) => norm(l.zoomInfoId ?? l.company)));
-  const newOnes = fresh
-    .filter((l) => !existingKeys.has(norm(l.zoomInfoId ?? l.company)))
-    .map((l) => {
-      const saved = overrides[l.zoomInfoId ?? l.company];
-      return saved ? { ...l, status: saved } : l;
-    });
+  const existingKeys = new Set(existing.map(key));
+  const newOnes = fresh.filter((l) => !existingKeys.has(key(l)));
 
-  return [...updated, ...newOnes].sort((a, b) => b.blendedScore - a.blendedScore);
+  // Run parent/subsidiary dedup across the full combined pool
+  return deduplicateLeads([...updated, ...newOnes]);
 }
 
-
-export function buildOverrides(leads: Lead[]): Record<string, LeadStatus> {
-  const out: Record<string, LeadStatus> = {};
-  for (const lead of leads) {
-    if (lead.status !== 'new') {
-      out[lead.zoomInfoId ?? lead.company] = lead.status;
-    }
-  }
-  return out;
+export function updateLeadStatus(leads: Lead[], id: string, status: LeadStatus): Lead[] {
+  return leads.map((l) => (l.id === id ? { ...l, status } : l));
 }
 
-function emptyState(): BuyerState {
-  return { leads: [], generatedAt: null, statusOverrides: {} };
+export function updateLeadAssignment(leads: Lead[], id: string, assignedTo: string): Lead[] {
+  return leads.map((l) => (l.id === id ? { ...l, assignedTo: assignedTo || undefined } : l));
 }

@@ -1,8 +1,3 @@
-/**
- * Web search via Google News RSS — free, no API key required.
- * All queries are built from the buyer's profile, so each buyer
- * (Dewey, Igor, Ed, …) gets searches tuned to their specific lane and seeds.
- */
 import { BuyerProfile } from '../types';
 
 export interface SearchResult {
@@ -12,100 +7,112 @@ export interface SearchResult {
   stream: 'signal' | 'lookalike';
 }
 
-/** Parse Google News RSS XML and extract article entries. */
-function parseRss(xml: string, stream: 'signal' | 'lookalike', maxResults = 15): SearchResult[] {
+function parseRss(xml: string, stream: 'signal' | 'lookalike', maxResults = 25): SearchResult[] {
   const items: SearchResult[] = [];
-
   for (const match of xml.matchAll(/<item>([\s\S]*?)<\/item>/g)) {
     const block = match[1];
-
     const titleMatch = block.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/) ??
                        block.match(/<title>([\s\S]*?)<\/title>/);
     const linkMatch  = block.match(/<link>([\s\S]*?)<\/link>/);
-
     const title = titleMatch?.[1]?.trim() ?? '';
     const url   = linkMatch?.[1]?.trim() ?? '';
-
     if (title && url) {
       items.push({ title, url, description: '', stream });
       if (items.length >= maxResults) break;
     }
   }
-
   return items;
 }
 
-/** Fetch one Google News RSS query. */
-async function fetchRss(query: string, stream: 'signal' | 'lookalike'): Promise<SearchResult[]> {
-  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;
+async function fetchRss(query: string, stream: 'signal' | 'lookalike', afterDate: string): Promise<SearchResult[]> {
+  // Append Google's date filter operator so only articles after the cutoff are returned
+  const timedQuery = `${query} after:${afterDate}`;
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(timedQuery)}&hl=en-US&gl=US&ceid=US:en`;
   const res = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; LewiscoBot/1.0)' },
     signal: AbortSignal.timeout(15_000),
   });
-  if (!res.ok) throw new Error(`Google News RSS error: ${res.status}`);
+  if (!res.ok) throw new Error(`RSS error: ${res.status}`);
   return parseRss(await res.text(), stream);
 }
 
-/**
- * Build signal-stream queries — one focused query per category so Google News
- * can actually match them. Concatenating all categories into one query returns
- * almost nothing.
- */
 function buildSignalQueries(profile: BuyerProfile): string[] {
   const year = new Date().getFullYear();
-  const cats = profile.categories.slice(0, 5);
   const queries: string[] = [];
 
-  for (const cat of cats) {
+  // One pair of queries per category — ALL categories, not just first 5
+  for (const cat of profile.categories) {
     queries.push(`${cat} manufacturer plant closure layoffs ${year}`);
-    queries.push(`${cat} brand acquisition merger inventory ${year}`);
+    queries.push(`${cat} brand acquisition merger excess inventory ${year}`);
   }
 
-  // Broad liquidation sweep
+  // Broad sweeps covering the full Lewisco universe
   queries.push(`food beverage manufacturer excess inventory liquidation closeout ${year}`);
-  queries.push(`CPG brand private equity acquisition SKU rationalization ${year}`);
+  queries.push(`CPG brand acquisition SKU rationalization inventory buyout ${year}`);
+  queries.push(`pet food health beauty household products manufacturer layoffs ${year}`);
+  queries.push(`frozen refrigerated food manufacturer plant closure ${year}`);
+  queries.push(`grocery brand divestiture overstock surplus inventory ${year}`);
+  queries.push(`consumer goods brand bankruptcy inventory liquidation ${year}`);
 
   return queries;
 }
 
 /**
- * Build lookalike-stream queries from the buyer's seed vendors.
+ * Build lookalike queries from profile seed vendors AND a sample of existing
+ * Zoho vendors — finding companies similar to ones Lewisco already buys from.
  */
-function buildLookalikeQueries(profile: BuyerProfile): string[] {
+function buildLookalikeQueries(profile: BuyerProfile, zohoVendors: string[]): string[] {
   const year = new Date().getFullYear();
-  const seeds = profile.seedVendors.slice(0, 6);
   const queries: string[] = [];
 
-  for (const seed of seeds) {
+  // All profile seed vendors
+  for (const seed of profile.seedVendors) {
     queries.push(`${seed} competitor brand closeout inventory ${year}`);
   }
 
-  // Lane-level sweeps
-  for (const lane of profile.lanes.slice(0, 2)) {
+  // Sample of Zoho vendors — pick every Nth to spread coverage across 700+
+  // Target ~25 Zoho-based queries
+  const step = Math.max(1, Math.floor(zohoVendors.length / 25));
+  const zohoSample = zohoVendors.filter((_, i) => i % step === 0).slice(0, 25);
+  for (const vendor of zohoSample) {
+    queries.push(`${vendor} competitor brand closeout inventory ${year}`);
+  }
+
+  // Lane-level sweeps — all lanes
+  for (const lane of profile.lanes) {
     queries.push(`${lane} brand closeout distributor buyout ${year}`);
   }
 
   return queries;
 }
 
-/**
- * Run all signal + lookalike searches in parallel for a specific buyer.
- * Returns deduped results tagged with their stream type.
- */
+function toISODate(d: Date): string {
+  return d.toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
 export async function runSignalSearches(
   profile: BuyerProfile,
-  _windowDays = 90
+  windowDays = 90,
+  zohoVendors: string[] = [],
 ): Promise<{ results: SearchResult[]; queriesRun: number }> {
-  const signalQueries   = buildSignalQueries(profile);
-  const lookalikeQueries = buildLookalikeQueries(profile);
+  // Calculate cutoff date from windowDays
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - windowDays);
+  const afterDate = toISODate(cutoff);
+  console.log(`[web-search] Date filter: after:${afterDate} (${windowDays}-day window)`);
+
+  const signalQueries    = buildSignalQueries(profile);
+  const lookalikeQueries = buildLookalikeQueries(profile, zohoVendors);
 
   const allQueries: Array<{ q: string; stream: 'signal' | 'lookalike' }> = [
-    ...signalQueries.map((q) => ({ q, stream: 'signal' as const })),
+    ...signalQueries.map((q)    => ({ q, stream: 'signal'   as const })),
     ...lookalikeQueries.map((q) => ({ q, stream: 'lookalike' as const })),
   ];
 
+  console.log(`[web-search] Running ${allQueries.length} queries (${signalQueries.length} signal, ${lookalikeQueries.length} lookalike)`);
+
   const settled = await Promise.allSettled(
-    allQueries.map(({ q, stream }) => fetchRss(q, stream))
+    allQueries.map(({ q, stream }) => fetchRss(q, stream, afterDate))
   );
 
   const results: SearchResult[] = [];
@@ -113,7 +120,7 @@ export async function runSignalSearches(
     if (outcome.status === 'fulfilled') results.push(...outcome.value);
   }
 
-  // Deduplicate by URL, preserving stream from first occurrence
+  // Deduplicate by URL
   const seen = new Set<string>();
   const deduped = results.filter((r) => {
     if (seen.has(r.url)) return false;
@@ -121,5 +128,6 @@ export async function runSignalSearches(
     return true;
   });
 
+  console.log(`[web-search] ${deduped.length} unique articles from ${allQueries.length} queries`);
   return { results: deduped, queriesRun: allQueries.length };
 }

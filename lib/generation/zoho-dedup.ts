@@ -42,18 +42,23 @@ async function getAccessToken(): Promise<string> {
  * Returns a Set of lowercased company names already in the buyer's Zoho vendor book.
  * Returns an empty Set on any error so the engine continues gracefully.
  */
+export interface ZohoVendorData {
+  normalized: Set<string>;  // lowercase, for dedup comparison
+  originals:  string[];     // original-case names, for lookalike search seeds
+}
+
 /**
- * Returns a Set of lowercased vendor names already in Zoho — all owners.
- * Any company already in the system is excluded as a lead, regardless of
- * which buyer owns them.
- * Returns an empty Set on any error so the engine continues gracefully.
+ * Returns all vendors in Zoho — normalized set for dedup and original names
+ * for use as lookalike search seeds.
+ * Returns empty data on any error so the engine continues gracefully.
  */
-export async function getExistingVendorNames(_zohoOwnerName: string): Promise<Set<string>> {
+export async function getZohoVendorData(_zohoOwnerName?: string): Promise<ZohoVendorData> {
   try {
     const token = await getAccessToken();
 
-    // Fetch all vendors across all owners, paginating up to 1000 records
-    const allNames = new Set<string>();
+    const normalized = new Set<string>();
+    const originals: string[] = [];
+
     for (let page = 1; page <= 5; page++) {
       const params = new URLSearchParams({
         fields: 'Vendor_Name',
@@ -74,18 +79,26 @@ export async function getExistingVendorNames(_zohoOwnerName: string): Promise<Se
       const data = await res.json();
       const vendors: Array<{ Vendor_Name?: string }> = data.data ?? [];
       for (const v of vendors) {
-        const name = (v.Vendor_Name ?? '').toLowerCase().trim();
-        if (name) allNames.add(name);
+        const name = (v.Vendor_Name ?? '').trim();
+        if (name) {
+          normalized.add(name.toLowerCase());
+          originals.push(name);
+        }
       }
 
-      // Stop paginating if this page was not full
       if (vendors.length < 200) break;
     }
 
-    console.log(`[zoho-dedup] ${allNames.size} total existing vendors found in Zoho`);
-    return allNames;
+    console.log(`[zoho-dedup] ${normalized.size} total vendors found in Zoho`);
+    return { normalized, originals };
   } catch {
     console.warn('[zoho-dedup] Skipping dedup — Zoho unavailable or not configured');
-    return new Set();
+    return { normalized: new Set(), originals: [] };
   }
+}
+
+// Backward-compat wrapper
+export async function getExistingVendorNames(_zohoOwnerName?: string): Promise<Set<string>> {
+  const { normalized } = await getZohoVendorData(_zohoOwnerName);
+  return normalized;
 }

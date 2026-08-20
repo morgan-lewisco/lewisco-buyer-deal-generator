@@ -1,25 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { DEFAULT_BUYERS } from '@/lib/buyers';
+import { NextResponse } from 'next/server';
+import { GLOBAL_PROFILE } from '@/lib/buyers';
 import { generateLeads } from '@/lib/generation/engine';
 import { GenerateOptions } from '@/lib/types';
 
-export const maxDuration = 300; // seconds — requires Vercel Pro plan
+export const maxDuration = 300;
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { buyerId, options, statusOverrides } = body as {
-      buyerId: string;
-      options: GenerateOptions;
-      statusOverrides?: Record<string, string>;
-    };
+    const { options } = body as { options: GenerateOptions };
 
-    const profile = DEFAULT_BUYERS.find((b) => b.id === buyerId);
-    if (!profile) {
-      return NextResponse.json({ error: `Unknown buyer: ${buyerId}` }, { status: 400 });
-    }
-
-    const result = await generateLeads(profile, options, statusOverrides ?? {});
+    const result = await generateLeads(GLOBAL_PROFILE, options ?? { excludeContacted: false, excludeDismissed: false, windowDays: 90 });
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

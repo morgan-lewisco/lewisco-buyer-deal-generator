@@ -123,8 +123,34 @@ const SENIORITY = [
   'owner', 'founder', 'partner',
 ];
 
+/**
+ * ZoomInfo returns titles in "Role, Function" format (e.g. "Manager, Purchasing")
+ * and uses "Vice President" not "VP". Expand titles to match both orderings and
+ * abbreviations so our substring scoring works correctly.
+ */
+function expandTitle(title: string): string {
+  const base = title.toLowerCase()
+    // Fix ZoomInfo HTML entity artifacts ("& Amp;" → "&")
+    .replace(/&\s*amp;/gi, '&')
+    // Expand long forms to abbreviations
+    .replace(/\bsenior vice president\b/g, 'svp')
+    .replace(/\bexecutive vice president\b/g, 'evp')
+    .replace(/\bvice president\b/g, 'vp');
+
+  // Also generate comma-reversed form: "Manager, Purchasing" → "purchasing manager"
+  const parts = base.split(/,\s*/);
+  const reversed = parts.length === 2
+    ? `${parts[1].trim()} ${parts[0].trim()}`
+    : '';
+
+  // Strip commas for flat matching ("vp, sales" → "vp sales")
+  const flat = base.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+
+  return [flat, reversed].filter(Boolean).join(' | ');
+}
+
 function roleScore(title: string): number {
-  const t = title.toLowerCase();
+  const t = expandTitle(title);
   let best = -1;
   for (let i = 0; i < ROLE_PRIORITY.length; i++) {
     if (t.includes(ROLE_PRIORITY[i])) best = i;
@@ -133,7 +159,7 @@ function roleScore(title: string): number {
 }
 
 function seniorityScore(title: string): number {
-  const t = title.toLowerCase();
+  const t = expandTitle(title);
   let best = -1;
   for (let i = 0; i < SENIORITY.length; i++) {
     if (t.includes(SENIORITY[i])) best = i;
@@ -153,8 +179,8 @@ interface ZIContact {
   jobTitle?: string;
 }
 
-// Strip common legal suffixes to improve ZoomInfo match rate
-const SUFFIX_RE = /\b(llc|inc|corp|co|ltd|foods|food|company|brands|group|international|enterprises|industries)\b\.?$/i;
+// Strip common legal/product suffixes to improve ZoomInfo match rate
+const SUFFIX_RE = /\b(llc|inc|corp|co|ltd|foods|food|snacks|snack|company|brands|brand|group|international|enterprises|industries|products|product)\b\.?$/i;
 
 function nameVariants(name: string): string[] {
   const clean = (s: string) => s.replace(/[,.\s]+$/, '').trim();
@@ -188,13 +214,40 @@ async function searchContacts(token: string, companyName: string): Promise<ZICon
   }));
 }
 
-async function fetchTopContact(token: string, companyName: string): Promise<{ name?: string; title?: string; ziId?: string } | null> {
+async function searchContactsByWebsite(token: string, website: string): Promise<ZIContact[]> {
+  // Strip protocol prefix if present
+  const domain = website.replace(/^https?:\/\//i, '').split('/')[0];
+  const res = await fetch(`${BASE}/gtm/data/v1/contacts/search`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/vnd.api+json',
+      'Accept':       'application/vnd.api+json',
+      'Authorization': `Bearer ${token}`,
+      'User-Agent':   USER_AGENT,
+    },
+    body: JSON.stringify({ data: { type: 'ContactSearch', attributes: { companyWebsite: domain } } }),
+  });
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.data ?? []).map((item: { id?: string | number; attributes?: ZIContact }) => ({
+    id:        item.id,
+    firstName: item.attributes?.firstName,
+    lastName:  item.attributes?.lastName,
+    jobTitle:  item.attributes?.jobTitle,
+  }));
+}
+
+async function fetchTopContact(token: string, companyName: string, website?: string): Promise<{ name?: string; title?: string; ziId?: string } | null> {
   try {
-    // Try original name first, then progressively stripped variants
+    // Try company name variants first, then fall back to website domain search
     let contacts: ZIContact[] = [];
     for (const variant of nameVariants(companyName)) {
       contacts = await searchContacts(token, variant);
       if (contacts.length > 0) break;
+    }
+    // Website fallback — ZoomInfo domain matching often more reliable than name
+    if (contacts.length === 0 && website) {
+      contacts = await searchContactsByWebsite(token, website);
     }
 
     if (contacts.length === 0) return null;
@@ -231,7 +284,7 @@ export async function enrichLeadsWithZoomInfo(leads: Lead[]): Promise<Lead[]> {
 
   for (let i = 0; i < leads.length; i += CONCURRENCY) {
     const batch   = leads.slice(i, i + CONCURRENCY);
-    const results = await Promise.all(batch.map((lead) => fetchTopContact(token, lead.company)));
+    const results = await Promise.all(batch.map((lead) => fetchTopContact(token, lead.company, lead.website)));
 
     results.forEach((patch, j) => {
       if (!patch) return;
