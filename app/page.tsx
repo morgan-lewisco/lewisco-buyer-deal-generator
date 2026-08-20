@@ -242,7 +242,7 @@ export default function AdminPage() {
             <div className="h-10 w-10 rounded-full border-4 border-lewisco-200 border-t-lewisco-600 animate-spin" />
             <div className="text-center">
               <p className="text-sm font-medium">
-                {status === 'searching' ? 'Scanning the web for closeout signals...' : 'AI is scoring and ranking leads...'}
+                {status === 'searching' ? 'Scanning the web for closeout signals...' : 'AI is scoring and ranking leads.. 1-2 minutes wait time'}
               </p>
               <p className="text-xs text-slate-300 mt-1">Usually 1–2 minutes</p>
             </div>
