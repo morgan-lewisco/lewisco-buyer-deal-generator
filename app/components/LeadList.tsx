@@ -65,30 +65,34 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
 
   if (leads.length === 0) return null;
 
-  const STATUS_TABS: { key: StatusFilter; label: string; activeClass: string; inactiveClass: string }[] = [
+  const STATUS_TABS: { key: StatusFilter; label: string; activeClass: string; inactiveClass: string; countClass: string }[] = [
     {
       key: 'all',
       label: `All Leads`,
-      activeClass:   'bg-slate-800 text-white border-slate-800 shadow-sm',
-      inactiveClass: 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50 hover:border-slate-500',
+      activeClass:   'bg-blue-600 text-white border-blue-600 shadow-sm',
+      inactiveClass: 'bg-white text-slate-600 border-slate-300 hover:bg-blue-50 hover:border-blue-400 hover:text-blue-700',
+      countClass:    'bg-white/25',
     },
     {
       key: 'active',
       label: `Active`,
-      activeClass:   'bg-lewisco-600 text-white border-lewisco-600 shadow-sm',
-      inactiveClass: 'bg-white text-slate-600 border-slate-300 hover:bg-lewisco-50 hover:border-lewisco-400 hover:text-lewisco-700',
+      activeClass:   'bg-orange-500 text-white border-orange-500 shadow-sm',
+      inactiveClass: 'bg-white text-slate-600 border-slate-300 hover:bg-orange-50 hover:border-orange-400 hover:text-orange-700',
+      countClass:    'bg-white/25',
     },
     {
       key: 'contacted',
       label: `Contacted`,
       activeClass:   'bg-emerald-600 text-white border-emerald-600 shadow-sm',
       inactiveClass: 'bg-white text-slate-600 border-slate-300 hover:bg-emerald-50 hover:border-emerald-400 hover:text-emerald-700',
+      countClass:    'bg-white/25',
     },
     {
       key: 'deals',
       label: `🏆 Deals Made`,
-      activeClass:   'bg-yellow-500 text-white border-yellow-500 shadow-sm',
+      activeClass:   'bg-yellow-400 text-black border-yellow-400 shadow-sm',
       inactiveClass: 'bg-white text-slate-600 border-slate-300 hover:bg-yellow-50 hover:border-yellow-400 hover:text-yellow-700',
+      countClass:    'bg-black/10 text-black',
     },
   ];
 
@@ -97,11 +101,11 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
       {/* Row 1: Status tabs + generate button */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-4 py-3 shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">
-          {STATUS_TABS.map(({ key, label, activeClass, inactiveClass }) => (
+          {STATUS_TABS.map(({ key, label, activeClass, inactiveClass, countClass }) => (
             <button key={key} onClick={() => setStatusFilter(key)}
               className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${statusFilter === key ? activeClass : inactiveClass}`}>
               {label}
-              <span className={`ml-1.5 text-xs rounded-full px-1.5 py-0.5 ${statusFilter === key ? 'bg-white/25' : 'bg-slate-100 text-slate-500'}`}>
+              <span className={`ml-1.5 text-xs rounded-full px-1.5 py-0.5 ${statusFilter === key ? countClass : 'bg-slate-100 text-slate-500'}`}>
                 {counts[key]}
               </span>
             </button>

@@ -52,7 +52,7 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
 
   const cardClass = [
     'rounded-lg border p-4 transition-all',
-    lead.dealMade ? 'border-yellow-300 bg-yellow-50/40' : '',
+    lead.dealMade ? 'border-yellow-400 bg-yellow-100' : '',
     !lead.dealMade && isContacted  ? 'border-emerald-200 bg-emerald-50/40' : '',
     !lead.dealMade && isDismissed  ? 'border-red-200 bg-red-50/30 opacity-70' : '',
     !lead.dealMade && !isContacted && !isDismissed ? 'border-slate-200 bg-white' : '',
