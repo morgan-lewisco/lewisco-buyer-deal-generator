@@ -76,7 +76,7 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
     },
     {
       key: 'active',
-      label: `Active`,
+      label: `Pending`,
       activeClass:   'bg-orange-500 text-white border-orange-500 shadow-sm',
       inactiveClass: 'bg-white text-slate-600 border-slate-300 hover:bg-orange-50 hover:border-orange-400 hover:text-orange-700',
       countClass:    'bg-white/25',
