@@ -194,15 +194,15 @@ export default function AdminPage() {
         {totalLeads > 0 && (
           <div className="mb-5 grid grid-cols-2 sm:grid-cols-5 gap-3">
             {[
-              { label: 'Total Leads', value: totalLeads,      border: 'border-blue-400',   num: 'text-blue-600',   sub: 'text-blue-400' },
-              { label: 'Unassigned',  value: unassignedCount, border: 'border-orange-400', num: 'text-orange-600', sub: 'text-orange-400' },
-              { label: 'Assigned',    value: assignedCount,   border: 'border-indigo-400', num: 'text-indigo-600', sub: 'text-indigo-400' },
-              { label: 'Contacted',   value: contactedCount,  border: 'border-emerald-400',num: 'text-emerald-600',sub: 'text-emerald-400' },
-              { label: 'Deals Made',  value: dealCount,       border: 'border-yellow-400', num: 'text-yellow-600', sub: 'text-yellow-500' },
-            ].map(({ label, value, border, num, sub }) => (
-              <div key={label} className={`rounded-xl bg-white border-2 ${border} px-4 py-3 shadow-sm text-center`}>
+              { label: 'Total Leads', value: totalLeads,      num: 'text-blue-600'   },
+              { label: 'Unassigned',  value: unassignedCount, num: 'text-orange-500' },
+              { label: 'Assigned',    value: assignedCount,   num: 'text-indigo-600' },
+              { label: 'Contacted',   value: contactedCount,  num: 'text-emerald-600'},
+              { label: 'Deals Made',  value: dealCount,       num: 'text-yellow-500' },
+            ].map(({ label, value, num }) => (
+              <div key={label} className="rounded-xl bg-white border-2 border-slate-300 px-4 py-3 shadow-sm text-center">
                 <div className={`text-2xl font-bold ${num}`}>{value}</div>
-                <div className={`text-xs mt-0.5 font-medium ${sub}`}>{label}</div>
+                <div className="text-xs mt-0.5 font-medium text-slate-500">{label}</div>
               </div>
             ))}
           </div>
