@@ -24,7 +24,6 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
 
   const activeLeads    = leads.filter((l) => l.status !== 'contacted');
   const contactedLeads = leads.filter((l) => l.status === 'contacted');
-  const unassigned     = leads.filter((l) => !l.assignedTo && l.status !== 'contacted').length;
 
   function applyFilter(pool: Lead[]): Lead[] {
     if (filterTab === 'all') return pool;
@@ -95,11 +94,11 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
       {/* Assignee filter */}
       <div className="flex flex-wrap items-center gap-1.5">
         {([
-          { key: 'all',        label: 'All Leads' },
-          { key: 'unassigned', label: `Unassigned (${unassigned})` },
+          { key: 'all',        label: `All Leads (${basePool.length})` },
+          { key: 'unassigned', label: `Unassigned (${basePool.filter((l) => !l.assignedTo).length})` },
           ...BUYER_NAMES.map((n) => ({
             key: n,
-            label: `${n.split(' ')[0]} (${leads.filter((l) => l.assignedTo === n).length})`,
+            label: `${n.split(' ')[0]} (${basePool.filter((l) => l.assignedTo === n).length})`,
           })),
         ] as { key: FilterTab; label: string }[]).map(({ key, label }) => (
           <button key={key} onClick={() => setFilterTab(key)}
@@ -116,7 +115,12 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
       {/* Lead cards */}
       {visible.length === 0 ? (
         <p className="py-12 text-center text-sm text-slate-400">
-          {statusTab === 'contacted' ? 'No contacted leads yet.' : 'No leads match this filter.'}
+          {statusTab === 'contacted' ? 'No contacted leads yet.' : (
+            filterTab !== 'all' && filterTab !== 'unassigned' &&
+            contactedLeads.filter((l) => l.assignedTo === filterTab).length > 0
+              ? `No active leads for ${filterTab.split(' ')[0]} — check the Contacted tab.`
+              : 'No leads match this filter.'
+          )}
         </p>
       ) : (
         <div className="space-y-3">
