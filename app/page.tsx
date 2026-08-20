@@ -194,15 +194,15 @@ export default function AdminPage() {
         {totalLeads > 0 && (
           <div className="mb-5 grid grid-cols-2 sm:grid-cols-5 gap-3">
             {[
-              { label: 'Total Leads',  value: totalLeads,      color: 'text-slate-900' },
-              { label: 'Unassigned',   value: unassignedCount, color: 'text-amber-700' },
-              { label: 'Assigned',     value: assignedCount,   color: 'text-lewisco-700' },
-              { label: 'Contacted',    value: contactedCount,  color: 'text-emerald-700' },
-              { label: 'Deals Made',   value: dealCount,       color: 'text-yellow-700' },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="rounded-xl bg-white border border-slate-200 px-4 py-3 shadow-sm text-center">
-                <div className={`text-2xl font-bold ${color}`}>{value}</div>
-                <div className="text-xs text-slate-500 mt-0.5">{label}</div>
+              { label: 'Total Leads', value: totalLeads,      bg: 'bg-blue-600',   num: 'text-white', sub: 'text-blue-100' },
+              { label: 'Unassigned',  value: unassignedCount, bg: 'bg-orange-500', num: 'text-white', sub: 'text-orange-100' },
+              { label: 'Assigned',    value: assignedCount,   bg: 'bg-indigo-600', num: 'text-white', sub: 'text-indigo-100' },
+              { label: 'Contacted',   value: contactedCount,  bg: 'bg-emerald-600',num: 'text-white', sub: 'text-emerald-100' },
+              { label: 'Deals Made',  value: dealCount,       bg: 'bg-yellow-400', num: 'text-black', sub: 'text-yellow-800' },
+            ].map(({ label, value, bg, num, sub }) => (
+              <div key={label} className={`rounded-xl ${bg} px-4 py-3 shadow-sm text-center`}>
+                <div className={`text-2xl font-bold ${num}`}>{value}</div>
+                <div className={`text-xs mt-0.5 font-medium ${sub}`}>{label}</div>
               </div>
             ))}
           </div>
