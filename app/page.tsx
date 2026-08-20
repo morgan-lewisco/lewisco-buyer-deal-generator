@@ -150,13 +150,15 @@ export default function AdminPage() {
           <div className="flex items-center gap-4">
             <img src="/lewisco-logo.png" alt="Lewisco Holdings" className="h-10 w-auto" />
             <div>
-              <h1 className="text-lg font-bold tracking-tight leading-none">Buyer Deal Generator</h1>
+              <div className="flex items-center gap-2 leading-none">
+                <h1 className="text-lg font-bold tracking-tight">Buyer Deal Generator</h1>
+                <span className="live-badge text-xs font-bold text-white rounded px-2.5 py-1 tracking-wide">LIVE</span>
+              </div>
               <p className="text-xs text-slate-400 mt-0.5">Lewisco Holdings · Admin</p>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
-            <span className="live-badge text-xs font-bold text-white rounded px-2.5 py-1 inline-block tracking-wide">LIVE</span>
             <button onClick={() => setShowAddModal(true)}
               className="text-xs text-slate-300 hover:text-white border border-slate-500 hover:border-slate-300 rounded px-2.5 py-1 transition">
               + Add Lead
