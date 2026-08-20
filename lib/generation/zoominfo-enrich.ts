@@ -18,7 +18,7 @@ const USER_AGENT = 'LewiscoHoldings-BuyerDealGenerator/1.0';
 let _cachedToken: string | null = null;
 let _tokenExpiresAt = 0;
 
-async function getAccessToken(): Promise<string | null> {
+export async function getAccessToken(): Promise<string | null> {
   if (_cachedToken && Date.now() < _tokenExpiresAt) return _cachedToken;
 
   const clientId     = process.env.ZOOMINFO_CLIENT_ID;
@@ -237,7 +237,7 @@ async function searchContactsByWebsite(token: string, website: string): Promise<
   }));
 }
 
-async function fetchTopContact(token: string, companyName: string, website?: string): Promise<{ name?: string; title?: string; ziId?: string } | null> {
+export async function fetchTopContact(token: string, companyName: string, website?: string): Promise<{ name?: string; title?: string; ziId?: string } | null> {
   try {
     // Try company name variants first, then fall back to website domain search
     let contacts: ZIContact[] = [];

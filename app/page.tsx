@@ -4,6 +4,7 @@ import { Lead, LeadStatus } from '@/lib/types';
 import { BUYER_NAMES } from '@/lib/buyers';
 import { accumulateLeads, updateLeadStatus, updateLeadAssignment } from '@/lib/persistence';
 import LeadList from './components/LeadList';
+import AddLeadModal from './components/AddLeadModal';
 
 type GenStatus = 'idle' | 'searching' | 'scoring' | 'done' | 'error';
 
@@ -22,6 +23,7 @@ export default function AdminPage() {
   const [errorMsg, setErrorMsg]       = useState('');
   const [meta, setMeta]               = useState<{ searches: number; signals: number; deduped: boolean } | null>(null);
   const [poolLoading, setPoolLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   // Save debounce — avoid hammering KV on rapid status/assignment changes
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -104,6 +106,14 @@ export default function AdminPage() {
     });
   }, [generatedAt, persistPool]);
 
+  const handleAddLead = useCallback((lead: Lead) => {
+    setLeads((prev) => {
+      const next = [lead, ...prev];
+      persistPool(next, generatedAt);
+      return next;
+    });
+  }, [generatedAt, persistPool]);
+
   async function handleClearPool() {
     if (!confirm('Clear all leads and start fresh? This cannot be undone.')) return;
     await fetch('/api/pool', { method: 'DELETE' });
@@ -147,6 +157,10 @@ export default function AdminPage() {
 
           <div className="flex items-center gap-3">
             <span className="live-badge text-xs font-bold text-white rounded px-2.5 py-1 inline-block tracking-wide">LIVE</span>
+            <button onClick={() => setShowAddModal(true)}
+              className="text-xs text-slate-300 hover:text-white border border-slate-500 hover:border-slate-300 rounded px-2.5 py-1 transition">
+              + Add Lead
+            </button>
             {leads.length > 0 && (
               <button onClick={handleClearPool}
                 className="text-xs text-slate-400 hover:text-red-400 border border-slate-600 hover:border-red-500 rounded px-2.5 py-1 transition">
@@ -258,6 +272,9 @@ export default function AdminPage() {
           />
         )}
       </main>
+      {showAddModal && (
+        <AddLeadModal onAdd={handleAddLead} onClose={() => setShowAddModal(false)} />
+      )}
     </div>
   );
 }
