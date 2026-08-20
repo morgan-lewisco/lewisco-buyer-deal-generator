@@ -43,6 +43,17 @@ function categoryClass(cat: string): string {
   return CATEGORY_CONFIG[cat.toLowerCase()] ?? 'bg-slate-100 text-slate-600';
 }
 
+// Filter out placeholder values that should display as blank
+function val(s?: string): string {
+  if (!s) return '';
+  const t = s.trim();
+  if (/^<.*>$/.test(t)) return '';           // <UNKNOWN>, <N/A>, etc.
+  if (/^unknown$/i.test(t)) return '';        // Unknown, UNKNOWN
+  if (/^n\/?a$/i.test(t)) return '';          // N/A, NA
+  if (t === '-' || t === '—') return '';
+  return t;
+}
+
 
 export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign, onDeal }: Props) {
   const isContacted = lead.status === 'contacted';
@@ -130,9 +141,9 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
 
             {/* Meta */}
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
-              {lead.revenueRange && <span>{lead.revenueRange}</span>}
-              {lead.employeeSize && <span>{lead.employeeSize} employees</span>}
-              {lead.location && <span>{lead.location}</span>}
+              {val(lead.revenueRange) && <span>{val(lead.revenueRange)}</span>}
+              {val(lead.employeeSize) && <span>{val(lead.employeeSize)} employees</span>}
+              {val(lead.location) && <span>{val(lead.location)}</span>}
               {lead.website && (
                 <a href={`https://${lead.website}`} target="_blank" rel="noopener noreferrer"
                    className="text-lewisco-600 hover:underline">{lead.website}</a>
