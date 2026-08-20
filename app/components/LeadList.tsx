@@ -34,7 +34,7 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
   function byStatus(pool: Lead[]): Lead[] {
     if (statusFilter === 'all') return pool;
     if (statusFilter === 'active') return pool.filter((l) => l.status !== 'contacted' && !l.dealMade);
-    if (statusFilter === 'contacted') return pool.filter((l) => l.status === 'contacted');
+    if (statusFilter === 'contacted') return pool.filter((l) => l.status === 'contacted' && !l.dealMade);
     if (statusFilter === 'deals') return pool.filter((l) => !!l.dealMade);
     return pool;
   }
@@ -47,7 +47,7 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
   const counts = {
     all:       personPool.length,
     active:    personPool.filter((l) => l.status !== 'contacted' && !l.dealMade).length,
-    contacted: personPool.filter((l) => l.status === 'contacted').length,
+    contacted: personPool.filter((l) => l.status === 'contacted' && !l.dealMade).length,
     deals:     personPool.filter((l) => !!l.dealMade).length,
   };
 
