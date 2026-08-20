@@ -144,9 +144,9 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
               {val(lead.revenueRange) && <span>{val(lead.revenueRange)}</span>}
               {val(lead.employeeSize) && <span>{val(lead.employeeSize)} employees</span>}
               {val(lead.location) && <span>{val(lead.location)}</span>}
-              {lead.website && (
-                <a href={`https://${lead.website}`} target="_blank" rel="noopener noreferrer"
-                   className="text-lewisco-600 hover:underline">{lead.website}</a>
+              {val(lead.website) && (
+                <a href={`https://${val(lead.website)}`} target="_blank" rel="noopener noreferrer"
+                   className="text-lewisco-600 hover:underline">{val(lead.website)}</a>
               )}
             </div>
 
