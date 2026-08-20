@@ -103,7 +103,7 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-4 py-3 shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">
           {STATUS_TABS.map(({ key, label, activeClass, inactiveClass, countClass }) => (
-            <button key={key} onClick={() => setStatusFilter(key)}
+            <button key={key} onClick={() => { setStatusFilter(key); if (key === 'all') setPersonFilter('all'); }}
               className={`px-4 py-2 text-sm font-semibold rounded-lg border transition-all ${statusFilter === key ? activeClass : inactiveClass}`}>
               {label}
               <span className={`ml-1.5 text-xs rounded-full px-1.5 py-0.5 ${statusFilter === key ? countClass : 'bg-slate-100 text-slate-500'}`}>
@@ -132,7 +132,6 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
       {/* Row 2: Person filter chips */}
       <div className="flex flex-wrap items-center gap-1.5">
         {([
-          { key: 'all' as PersonFilter,        label: 'Everyone' },
           { key: 'unassigned' as PersonFilter, label: `Unassigned (${leads.filter((l) => !l.assignedTo).length})` },
           { key: 'assigned' as PersonFilter,   label: `Assigned (${leads.filter((l) => !!l.assignedTo).length})` },
           ...BUYER_NAMES.map((n) => ({
