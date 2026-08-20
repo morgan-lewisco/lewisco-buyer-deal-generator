@@ -26,6 +26,7 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
   function byPerson(pool: Lead[]): Lead[] {
     if (personFilter === 'all') return pool;
     if (personFilter === 'unassigned') return pool.filter((l) => !l.assignedTo);
+    if (personFilter === 'assigned') return pool.filter((l) => !!l.assignedTo);
     return pool.filter((l) => l.assignedTo === personFilter);
   }
 
@@ -133,6 +134,7 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
         {([
           { key: 'all' as PersonFilter,        label: 'Everyone' },
           { key: 'unassigned' as PersonFilter, label: `Unassigned (${leads.filter((l) => !l.assignedTo).length})` },
+          { key: 'assigned' as PersonFilter,   label: `Assigned (${leads.filter((l) => !!l.assignedTo).length})` },
           ...BUYER_NAMES.map((n) => ({
             key: n as PersonFilter,
             label: `${n.split(' ')[0]} (${leads.filter((l) => l.assignedTo === n).length})`,
