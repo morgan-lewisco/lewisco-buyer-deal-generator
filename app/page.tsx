@@ -129,7 +129,12 @@ export default function AdminPage() {
       {/* Header */}
       <header className="header-platinum text-white shadow-lg overflow-hidden relative">
         <span className="absolute left-3 top-1 text-white/5 text-7xl font-bold select-none pointer-events-none">$</span>
+        <span className="absolute left-28 top-2 text-white/3 text-5xl font-bold select-none pointer-events-none">$</span>
+        <span className="absolute left-1/4 top-0 text-white/4 text-6xl font-bold select-none pointer-events-none">$</span>
+        <span className="absolute left-1/2 top-1 text-white/3 text-5xl font-bold select-none pointer-events-none">$</span>
         <span className="absolute right-48 top-0 text-white/4 text-6xl font-bold select-none pointer-events-none">$</span>
+        <span className="absolute right-24 top-2 text-white/3 text-5xl font-bold select-none pointer-events-none">$</span>
+        <span className="absolute right-4 top-1 text-white/4 text-6xl font-bold select-none pointer-events-none">$</span>
 
         <div className="mx-auto max-w-5xl px-4 py-4 flex flex-wrap items-center justify-between gap-4 relative z-10">
           <div className="flex items-center gap-4">
