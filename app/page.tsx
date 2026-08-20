@@ -194,13 +194,13 @@ export default function AdminPage() {
         {totalLeads > 0 && (
           <div className="mb-5 grid grid-cols-2 sm:grid-cols-5 gap-3">
             {[
-              { label: 'Total Leads', value: totalLeads,      bg: 'bg-blue-600',   num: 'text-white', sub: 'text-blue-100' },
-              { label: 'Unassigned',  value: unassignedCount, bg: 'bg-orange-500', num: 'text-white', sub: 'text-orange-100' },
-              { label: 'Assigned',    value: assignedCount,   bg: 'bg-indigo-600', num: 'text-white', sub: 'text-indigo-100' },
-              { label: 'Contacted',   value: contactedCount,  bg: 'bg-emerald-600',num: 'text-white', sub: 'text-emerald-100' },
-              { label: 'Deals Made',  value: dealCount,       bg: 'bg-yellow-400', num: 'text-black', sub: 'text-yellow-800' },
-            ].map(({ label, value, bg, num, sub }) => (
-              <div key={label} className={`rounded-xl ${bg} px-4 py-3 shadow-sm text-center`}>
+              { label: 'Total Leads', value: totalLeads,      border: 'border-blue-400',   num: 'text-blue-600',   sub: 'text-blue-400' },
+              { label: 'Unassigned',  value: unassignedCount, border: 'border-orange-400', num: 'text-orange-600', sub: 'text-orange-400' },
+              { label: 'Assigned',    value: assignedCount,   border: 'border-indigo-400', num: 'text-indigo-600', sub: 'text-indigo-400' },
+              { label: 'Contacted',   value: contactedCount,  border: 'border-emerald-400',num: 'text-emerald-600',sub: 'text-emerald-400' },
+              { label: 'Deals Made',  value: dealCount,       border: 'border-yellow-400', num: 'text-yellow-600', sub: 'text-yellow-500' },
+            ].map(({ label, value, border, num, sub }) => (
+              <div key={label} className={`rounded-xl bg-white border-2 ${border} px-4 py-3 shadow-sm text-center`}>
                 <div className={`text-2xl font-bold ${num}`}>{value}</div>
                 <div className={`text-xs mt-0.5 font-medium ${sub}`}>{label}</div>
               </div>
