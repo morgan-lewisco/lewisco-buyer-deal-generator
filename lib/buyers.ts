@@ -1,7 +1,7 @@
 import { BuyerProfile } from './types';
 
 // Buyer managers who can be assigned leads
-export const BUYER_NAMES = ['Dewey Yeager', 'Igor Vega', 'Edward Rivers', 'Donny', 'Jesse', 'Alex', 'Evan', 'Jeff'];
+export const BUYER_NAMES = ['Dewey Yeager', 'Igor Vega', 'Edward Rivers', 'Donny Carter', 'Jesse Kroll', 'Alex Chaney', 'Evan Jaslow', 'Jeff'];
 
 // Single global profile — covers all of Lewisco's categories and signals
 export const GLOBAL_PROFILE: BuyerProfile = {
