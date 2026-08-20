@@ -1,7 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Lead, LeadStatus } from '@/lib/types';
-import { BUYER_NAMES } from '@/lib/buyers';
 import { accumulateLeads, updateLeadStatus, updateLeadAssignment, updateLeadDeal } from '@/lib/persistence';
 import LeadList from './components/LeadList';
 import AddLeadModal from './components/AddLeadModal';
@@ -209,23 +208,6 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* Buyer summary chips */}
-        {totalLeads > 0 && (
-          <div className="mb-5 flex flex-wrap gap-2">
-            {BUYER_NAMES.map((name) => {
-              const count = leads.filter((l) => l.assignedTo === name).length;
-              return (
-                <div key={name} className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs shadow-sm">
-                  <span className="w-5 h-5 rounded-full bg-lewisco-100 text-lewisco-700 font-bold flex items-center justify-center text-[10px]">
-                    {name[0]}
-                  </span>
-                  <span className="font-medium text-slate-700">{name.split(' ')[0]}</span>
-                  <span className="font-semibold text-lewisco-700">{count}</span>
-                </div>
-              );
-            })}
-          </div>
-        )}
 
         {/* Meta info */}
         {meta && (
