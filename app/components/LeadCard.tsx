@@ -85,7 +85,7 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
                 <span className="text-xs font-medium text-yellow-800 bg-yellow-200 rounded-full px-2 py-0.5">🤝 Deal Made</span>
               )}
               {isContacted && !lead.dealMade && (
-                <span className="text-xs font-medium text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">✓ Contacted</span>
+                <span className="text-xs font-medium text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">✓ Engaged</span>
               )}
               {isDismissed && (
                 <span className="text-xs font-medium text-red-700 bg-red-100 rounded-full px-2 py-0.5">Dismissed</span>
@@ -251,7 +251,7 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
               <input type="checkbox" checked={isContacted}
                 onChange={() => onContact(lead.id)}
                 className="w-4 h-4 accent-emerald-600 cursor-pointer" />
-              <span className="text-xs text-slate-500 hidden sm:inline">Contacted</span>
+              <span className="text-xs text-slate-500 hidden sm:inline">Engaged</span>
             </label>
 
             {isDismissed ? (

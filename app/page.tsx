@@ -185,7 +185,7 @@ export default function AdminPage() {
         </div>
 
         <div className="bg-black/20 border-t border-white/10 px-4 py-1.5 text-center text-xs text-slate-400">
-          AI-generated leads via live web search · Assign leads to buyer managers · Mark contacted when outreach is complete
+          AI-generated leads via live web search · Assign leads to buyer managers · Mark engaged when outreach is in motion
         </div>
       </header>
 
@@ -197,7 +197,7 @@ export default function AdminPage() {
               { label: 'Total Leads', value: totalLeads,      num: 'text-blue-600'   },
               { label: 'Unassigned',  value: unassignedCount, num: 'text-orange-500' },
               { label: 'Assigned',    value: assignedCount,   num: 'text-indigo-600' },
-              { label: 'Contacted',   value: contactedCount,  num: 'text-emerald-600'},
+              { label: 'Engaged',     value: contactedCount,  num: 'text-emerald-600'},
               { label: 'Deals Made',  value: dealCount,       num: 'text-yellow-500' },
             ].map(({ label, value, num }) => (
               <div key={label} className="rounded-xl bg-white border-2 border-slate-300 px-4 py-3 shadow-sm text-center">

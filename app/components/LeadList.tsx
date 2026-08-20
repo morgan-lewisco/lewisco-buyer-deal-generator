@@ -83,7 +83,7 @@ export default function LeadList({ leads, onUpdateStatus, onAssign, onDeal, onGe
     },
     {
       key: 'contacted',
-      label: `Contacted`,
+      label: `Engaged`,
       activeClass:   'bg-emerald-600 text-white border-emerald-600 shadow-sm',
       inactiveClass: 'bg-white text-slate-600 border-slate-300 hover:bg-emerald-50 hover:border-emerald-400 hover:text-emerald-700',
       countClass:    'bg-white/25',
