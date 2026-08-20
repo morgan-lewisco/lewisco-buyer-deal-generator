@@ -122,8 +122,8 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
 
             {/* Meta */}
             <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-slate-500">
-              {lead.revenueRange && !lead.revenueRange.toLowerCase().includes('unknown') && <span>{lead.revenueRange}</span>}
-              {lead.employeeSize && !lead.employeeSize.toLowerCase().includes('unknown') && <span>{lead.employeeSize} employees</span>}
+              {lead.revenueRange && <span>{lead.revenueRange}</span>}
+              {lead.employeeSize && <span>{lead.employeeSize} employees</span>}
               {lead.location && <span>{lead.location}</span>}
               {lead.website && (
                 <a href={`https://${lead.website}`} target="_blank" rel="noopener noreferrer"
