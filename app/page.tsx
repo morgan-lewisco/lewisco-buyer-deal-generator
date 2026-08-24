@@ -138,7 +138,7 @@ export default function AdminPage() {
   const isLoading       = status === 'searching' || status === 'scoring';
   const totalLeads      = leads.length;
   const assignedCount   = leads.filter((l) => l.assignedTo).length;
-  const contactedCount  = leads.filter((l) => l.status === 'contacted').length;
+  const contactedCount  = leads.filter((l) => l.status === 'contacted' && !l.dealMade).length;
   const unassignedCount = leads.filter((l) => !l.assignedTo && l.status !== 'contacted').length;
   const dealCount       = leads.filter((l) => l.dealMade).length;
 
