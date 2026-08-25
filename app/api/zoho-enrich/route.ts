@@ -110,13 +110,22 @@ export async function POST(req: NextRequest) {
           vendorOriginatorByName: pickStr(v.Vendor_Originator_By_Name),
         };
 
-        // Exact key: lowercased raw name
-        exactMap.set(raw.toLowerCase(), row);
+        // Split on "/" and "DBA" to index each name variant separately.
+        // e.g. "Franklin Foods Co / Green Mountain Farms" → two variants
+        const variants = raw
+          .split(/\s*\/\s*|\bDBA\b/i)
+          .map((s) => s.trim())
+          .filter(Boolean);
 
-        // First-word key: first meaningful token (min 4 chars to avoid false positives)
-        const fw = firstToken(raw);
-        if (fw.length >= 4 && !firstWordMap.has(fw)) {
-          firstWordMap.set(fw, row);
+        for (const variant of variants) {
+          // Exact key
+          exactMap.set(variant.toLowerCase(), row);
+
+          // First-word key (min 4 chars, first writer wins per key)
+          const fw = firstToken(variant);
+          if (fw.length >= 4 && !firstWordMap.has(fw)) {
+            firstWordMap.set(fw, row);
+          }
         }
       }
 
