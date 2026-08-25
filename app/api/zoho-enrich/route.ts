@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     const coreMap      = new Map<string, VendorStub>();
     const firstWordMap = new Map<string, VendorStub>();
 
-    for (let page = 1; page <= 10; page++) {
+    for (let page = 1; page <= 50; page++) {
       const params = new URLSearchParams({
         fields: 'Vendor_Name',
         per_page: '200',
@@ -174,8 +174,6 @@ export async function POST(req: NextRequest) {
           const data = await res.json();
           const record = data.data?.[0] ?? data;
           detailMap.set(id, record);
-          // Log all field keys once so we can confirm the right names
-          console.log('[zoho-enrich] vendor fields:', Object.keys(record).join(', '));
         } catch (e) {
           console.warn('[zoho-enrich] detail fetch error for', id, e);
         }
@@ -194,23 +192,11 @@ export async function POST(req: NextRequest) {
 
       const record = detailMap.get(info.vendorId) ?? {};
 
-      // Try likely API names for "Bought Manager" custom field
-      const boughtManager = pickStr(
-        record['Bought_Manager'] ??
-        record['Bought_Manager1'] ??
-        record['Bought Manager'] ??
-        record['bought_manager'] ??
-        null
-      );
+      // "Bought Manager" — API field is Vendor_manager (confirmed from Zoho field log)
+      const boughtManager = pickStr(record['Vendor_manager'] ?? null);
 
-      // Try likely API names for "Vendor Originator By Name" custom field
-      const vendorOriginatorByName = pickStr(
-        record['Vendor_Originator_By_Name'] ??
-        record['Vendor_Originator_By_Name1'] ??
-        record['Vendor Originator By Name'] ??
-        record['vendor_originator_by_name'] ??
-        null
-      );
+      // "Vendor Originator By Name" — API field confirmed from Zoho field log
+      const vendorOriginatorByName = pickStr(record['Vendor_Originator_By_Name'] ?? null);
 
       result[company] = {
         found: true,
