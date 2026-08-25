@@ -42,7 +42,8 @@ const CORP_SUFFIXES = new Set([
 function rawTokens(name: string): string[] {
   return name
     .toLowerCase()
-    .replace(/['''''`´]/g, '')
+    .replace(/['''''`´]s\b/g, '')   // strip possessive 's as a unit: "Schwebel's" → "Schwebel"
+    .replace(/['''''`´]/g, '')      // strip any remaining apostrophes
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter((t) => t.length > 0);
@@ -135,7 +136,7 @@ async function searchVendor(
     }
   }
 
-  if (!best || best.score < 70) return null;
+  if (!best || best.score < 80) return null;
 
   return {
     boughtManager:          pickStr(best.record['Vendor_manager'])             || 'None',
