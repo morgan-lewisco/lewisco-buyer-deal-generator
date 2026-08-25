@@ -34,7 +34,9 @@ const STOP_WORDS = new Set([
   'international', 'industries', 'industry', 'products',
   'enterprises', 'holdings', 'solutions', 'services',
   'farms', 'distribution', 'distributing', 'wholesale',
-  'natural', 'nutrition', 'health', 'wellness',
+  // NOTE: natural/nutrition/health/wellness intentionally NOT here —
+  // they appear in actual brand names (e.g. "Natural Balance") and stripping
+  // them causes false negatives.
 ]);
 
 function rawTokens(name: string): string[] {
@@ -54,16 +56,23 @@ function coreTokens(name: string): string[] {
 
 function matchScore(lead: string, zohoName: string): number {
   if (rawTokens(lead).join(' ') === rawTokens(zohoName).join(' ')) return 100;
-  const lc = coreTokens(lead).join(' ');
-  const zc = coreTokens(zohoName).join(' ');
+  const lTokens = coreTokens(lead);
+  const zTokens = coreTokens(zohoName);
+  const lc = lTokens.join(' ');
+  const zc = zTokens.join(' ');
   if (lc && zc && lc === zc) return 90;
   if (lc && zc && (lc.startsWith(zc + ' ') || zc.startsWith(lc + ' '))) return 85;
+  // Distinctive first-token match — only accept tokens ≥5 chars to avoid
+  // false positives on short/generic words like "us", "big", "top"
+  const lf = lTokens[0] ?? '';
+  const zf = zTokens[0] ?? '';
+  if (lf.length >= 5 && lf === zf) return 70;
   return 0;
 }
 
 // ── Vendor index (KV-cached, refreshed every 2 h) ────────────────────────────
 
-const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v2';
+const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v3';
 const VENDOR_CACHE_TTL = 60 * 60 * 2; // 2 hours
 
 type VendorStub = { id: string; name: string };
@@ -165,21 +174,27 @@ export async function POST(req: NextRequest) {
     const stubs  = await getVendorIndex(token);
 
     // Build index — each Zoho name may have "/" variants
-    type Entry = { id: string; variants: string[] };
+    type Entry = { id: string; name: string; variants: string[] };
     const entries: Entry[] = stubs.map(({ id, name }) => ({
       id,
+      name,
       variants: name.split(/\s*\/\s*|\bDBA\b/i).map((s) => s.trim()).filter(Boolean),
     }));
 
     // Match each company
     const matchedIds = new Map<string, string>(); // company → vendor id
     for (const company of companies) {
-      let best = { score: 0, id: '' };
-      for (const { id, variants } of entries) {
+      let best = { score: 0, id: '', name: '' };
+      for (const { id, variants, name: zohoName } of entries) {
         const score = Math.max(...variants.map((v) => matchScore(company, v)));
-        if (score > best.score) best = { score, id };
+        if (score > best.score) best = { score, id, name: zohoName };
       }
-      if (best.score >= 80) matchedIds.set(company, best.id);
+      if (best.score >= 70) {
+        matchedIds.set(company, best.id);
+        console.log(`[zoho-enrich] MATCH  "${company}" → "${best.name}" (score ${best.score})`);
+      } else {
+        console.log(`[zoho-enrich] MISS   "${company}" — best score ${best.score} vs "${best.name}"`);
+      }
     }
 
     console.log(`[zoho-enrich] ${companies.length} companies → ${matchedIds.size} matched`);
