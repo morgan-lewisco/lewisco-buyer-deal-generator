@@ -48,23 +48,118 @@ function rawTokens(name: string): string[] {
     .filter((t) => t.length > 0);
 }
 
-function coreKey(name: string): string {
+/** First non-suffix token — used as the Zoho search term */
+function searchToken(name: string): string {
   const tokens = rawTokens(name);
-  while (tokens.length > 1 && CORP_SUFFIXES.has(tokens[tokens.length - 1])) tokens.pop();
-  while (tokens.length > 1 && CORP_SUFFIXES.has(tokens[0])) tokens.shift();
-  return tokens.join(' ');
+  const meaningful = tokens.filter((t) => !CORP_SUFFIXES.has(t));
+  return (meaningful.length > 0 ? meaningful : tokens)[0] ?? '';
 }
 
-function firstToken(name: string): string {
-  const tokens = rawTokens(name).filter((t) => !CORP_SUFFIXES.has(t));
-  return (tokens.length > 0 ? tokens : rawTokens(name))[0] ?? '';
+/** Score how well a Zoho vendor name matches the lead company name (higher = better) */
+function matchScore(lead: string, zohoName: string): number {
+  const lt = rawTokens(lead);
+  const zt = rawTokens(zohoName);
+
+  // Exact token-set match
+  if (lt.join(' ') === zt.join(' ')) return 100;
+
+  // Both reduce to same core after stripping suffixes
+  const lc = lt.filter((t) => !CORP_SUFFIXES.has(t));
+  const zc = zt.filter((t) => !CORP_SUFFIXES.has(t));
+  if (lc.length && zc.length && lc.join(' ') === zc.join(' ')) return 90;
+
+  // First meaningful token matches
+  if (lc[0] && zc[0] && lc[0] === zc[0]) return 70;
+
+  // One name contains the other (handles "Tyson" ↔ "Tyson Foods")
+  const ls = lt.join(' ');
+  const zs = zt.join(' ');
+  if (ls.startsWith(zs + ' ') || zs.startsWith(ls + ' ') || ls === zs) return 80;
+
+  return 0;
 }
 
 export interface ZohoMatch {
   found: boolean;
   boughtManager: string;
   vendorOriginatorByName: string;
-  matchType?: 'exact' | 'core' | 'first-word';
+}
+
+// Search Zoho for a single company; returns null if not found
+async function searchVendor(
+  token: string,
+  company: string,
+): Promise<{ boughtManager: string; vendorOriginatorByName: string } | null> {
+  const term = searchToken(company);
+  if (!term || term.length < 2) return null;
+
+  // Zoho also stores DBA names in Vendor_DBA — search that too
+  const criteria = `(Vendor_Name:contains:${term})`;
+  const params = new URLSearchParams({
+    criteria,
+    fields: 'Vendor_Name,Vendor_DBA,Vendor_manager,Vendor_Originator_By_Name',
+    per_page: '10',
+  });
+
+  const res = await fetch(`https://www.zohoapis.com/crm/v3/Vendors/search?${params}`, {
+    headers: { Authorization: `Zoho-oauthtoken ${token}` },
+    signal: AbortSignal.timeout(8_000),
+  });
+
+  if (res.status === 204) return null; // no results
+  if (!res.ok) {
+    console.warn('[zoho-enrich] search failed for', company, res.status, await res.text());
+    return null;
+  }
+
+  const data = await res.json();
+  const candidates: Array<Record<string, unknown>> = data.data ?? [];
+  if (!candidates.length) return null;
+
+  // Score each candidate against the lead company name
+  // Also split on "/" (DBA entries) to check all name variants
+  let best: { score: number; record: Record<string, unknown> } | null = null;
+
+  for (const record of candidates) {
+    const vendorName = String(record['Vendor_Name'] ?? '');
+    const vendorDBA  = String(record['Vendor_DBA']  ?? '');
+
+    // All name variants this record represents
+    const nameVariants = [vendorName, vendorDBA]
+      .flatMap((n) => n.split('/').map((s) => s.trim()))
+      .filter(Boolean);
+
+    const score = Math.max(...nameVariants.map((n) => matchScore(company, n)));
+
+    if (score > 0 && (!best || score > best.score)) {
+      best = { score, record };
+    }
+  }
+
+  if (!best || best.score < 70) return null;
+
+  return {
+    boughtManager:          pickStr(best.record['Vendor_manager'])             || 'None',
+    vendorOriginatorByName: pickStr(best.record['Vendor_Originator_By_Name'])  || 'None',
+  };
+}
+
+// Run at most `limit` promises concurrently
+async function pMap<T, R>(
+  items: T[],
+  fn: (item: T) => Promise<R>,
+  limit: number,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let idx = 0;
+  async function worker() {
+    while (idx < items.length) {
+      const i = idx++;
+      results[i] = await fn(items[i]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
 }
 
 export async function POST(req: NextRequest) {
@@ -73,139 +168,20 @@ export async function POST(req: NextRequest) {
     if (!companies?.length) return NextResponse.json({});
 
     const token = await getToken();
+    const unique = [...new Set(companies)];
 
-    // ── Phase 1: bulk-fetch vendor names + IDs only ──────────────────────────
-    // We deliberately avoid custom field names here — Zoho returns a 400 if
-    // an unknown field is requested, which would silently break pagination.
-    type VendorStub = { id: string };
-    const exactMap     = new Map<string, VendorStub>();
-    const coreMap      = new Map<string, VendorStub>();
-    const firstWordMap = new Map<string, VendorStub>();
+    // Search Zoho for each company, up to 8 concurrent requests
+    const matches = await pMap(unique, (company) => searchVendor(token, company), 8);
 
-    for (let page = 1; page <= 50; page++) {
-      const params = new URLSearchParams({
-        fields: 'Vendor_Name',
-        per_page: '200',
-        page: String(page),
-      });
-      const res = await fetch(`https://www.zohoapis.com/crm/v3/Vendors?${params}`, {
-        headers: { Authorization: `Zoho-oauthtoken ${token}` },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (!res.ok) {
-        const body = await res.text();
-        console.warn('[zoho-enrich] phase1 failed:', res.status, body);
-        break;
-      }
-      const data = await res.json();
-      const vendors: Array<Record<string, unknown>> = data.data ?? [];
-
-      for (const v of vendors) {
-        const raw = String(v.Vendor_Name ?? '').trim();
-        const id  = String(v.id ?? '');
-        if (!raw || !id) continue;
-
-        // Split on "/" and "DBA" — index each variant
-        const variants = raw.split(/\s*\/\s*|\bDBA\b/i).map((s) => s.trim()).filter(Boolean);
-
-        for (const variant of variants) {
-          const stub: VendorStub = { id };
-
-          exactMap.set(rawTokens(variant).join(' '), stub);
-
-          const ck = coreKey(variant);
-          if (ck && !coreMap.has(ck)) coreMap.set(ck, stub);
-
-          const fw = firstToken(variant);
-          if (fw.length >= 4 && !firstWordMap.has(fw)) firstWordMap.set(fw, stub);
-        }
-      }
-
-      console.log(`[zoho-enrich] page ${page}: ${vendors.length} vendors`);
-      if (vendors.length < 200) break;
-    }
-
-    console.log(`[zoho-enrich] indexed: ${exactMap.size} exact / ${coreMap.size} core / ${firstWordMap.size} first-word`);
-
-    // ── Phase 2: match each company, collect unique vendor IDs ───────────────
-    type MatchInfo = { vendorId: string; matchType: ZohoMatch['matchType'] };
-    const matchMap = new Map<string, MatchInfo>(); // company → match info
-
-    for (const company of companies) {
-      let stub: VendorStub | undefined;
-      let matchType: ZohoMatch['matchType'];
-
-      stub = exactMap.get(rawTokens(company).join(' '));
-      if (stub) matchType = 'exact';
-
-      if (!stub) {
-        stub = coreMap.get(coreKey(company));
-        if (stub) matchType = 'core';
-      }
-
-      if (!stub) {
-        const fw = firstToken(company);
-        if (fw.length >= 4) {
-          stub = firstWordMap.get(fw);
-          if (stub) matchType = 'first-word';
-        }
-      }
-
-      if (stub) matchMap.set(company, { vendorId: stub.id, matchType });
-    }
-
-    // ── Phase 3: fetch full records for matched vendor IDs ───────────────────
-    // Fetch without specifying fields so Zoho returns everything it has access
-    // to, including custom fields — no guessing about API names required.
-    const uniqueIds = [...new Set([...matchMap.values()].map((m) => m.vendorId))];
-    const detailMap = new Map<string, Record<string, unknown>>(); // id → full record
-
-    await Promise.all(
-      uniqueIds.map(async (id) => {
-        try {
-          const res = await fetch(`https://www.zohoapis.com/crm/v3/Vendors/${id}`, {
-            headers: { Authorization: `Zoho-oauthtoken ${token}` },
-            signal: AbortSignal.timeout(10_000),
-          });
-          if (!res.ok) {
-            console.warn('[zoho-enrich] detail fetch failed for', id, res.status);
-            return;
-          }
-          const data = await res.json();
-          const record = data.data?.[0] ?? data;
-          detailMap.set(id, record);
-        } catch (e) {
-          console.warn('[zoho-enrich] detail fetch error for', id, e);
-        }
-      })
-    );
-
-    // ── Build result ─────────────────────────────────────────────────────────
     const result: Record<string, ZohoMatch> = {};
+    unique.forEach((company, i) => {
+      const m = matches[i];
+      result[company] = m
+        ? { found: true, ...m }
+        : { found: false, boughtManager: '', vendorOriginatorByName: '' };
+    });
 
-    for (const company of companies) {
-      const info = matchMap.get(company);
-      if (!info) {
-        result[company] = { found: false, boughtManager: '', vendorOriginatorByName: '' };
-        continue;
-      }
-
-      const record = detailMap.get(info.vendorId) ?? {};
-
-      // "Bought Manager" — API field is Vendor_manager (confirmed from Zoho field log)
-      const boughtManager = pickStr(record['Vendor_manager'] ?? null);
-
-      // "Vendor Originator By Name" — API field confirmed from Zoho field log
-      const vendorOriginatorByName = pickStr(record['Vendor_Originator_By_Name'] ?? null);
-
-      result[company] = {
-        found: true,
-        boughtManager:          boughtManager          || 'None',
-        vendorOriginatorByName: vendorOriginatorByName || 'None',
-        matchType: info.matchType,
-      };
-    }
-
+    console.log(`[zoho-enrich] ${unique.length} companies → ${matches.filter(Boolean).length} matched`);
     return NextResponse.json(result);
   } catch (err) {
     console.error('[zoho-enrich]', err);
