@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { kv } from '@vercel/kv';
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
 
 let _cachedToken: { token: string; expiresAt: number } | null = null;
 
@@ -13,28 +16,18 @@ async function getToken(): Promise<string> {
     refresh_token: ZOHO_REFRESH_TOKEN,
   });
   const res = await fetch(`https://accounts.zoho.com/oauth/v2/token?${params}`, {
-    method: 'POST',
-    signal: AbortSignal.timeout(10_000),
+    method: 'POST', signal: AbortSignal.timeout(10_000),
   });
   const data = await res.json();
-  if (!data.access_token) throw new Error(`Token exchange failed: ${JSON.stringify(data)}`);
+  if (!data.access_token) throw new Error(`Token failed: ${JSON.stringify(data)}`);
   _cachedToken = { token: data.access_token, expiresAt: Date.now() + (data.expires_in ?? 3600) * 1000 };
   return _cachedToken.token;
 }
 
-function pickStr(v: unknown): string {
-  if (!v) return '';
-  if (typeof v === 'string') return v.trim();
-  if (typeof v === 'object' && v !== null && 'name' in v)
-    return String((v as Record<string, unknown>).name).trim();
-  return '';
-}
+// ── Name normalisation ────────────────────────────────────────────────────────
 
-// Words stripped when building core tokens for comparison and search
 const STOP_WORDS = new Set([
-  // articles / prepositions (causes "The Simply Good Foods" to not match "Simply Good Foods")
   'the', 'a', 'an', 'of', 'and',
-  // corporate suffixes
   'inc', 'co', 'corp', 'llc', 'ltd', 'lp', 'plc',
   'company', 'corporation', 'incorporated', 'limited',
   'foods', 'food', 'baking', 'brands', 'brand', 'group',
@@ -47,44 +40,115 @@ const STOP_WORDS = new Set([
 function rawTokens(name: string): string[] {
   return name
     .toLowerCase()
-    .replace(/['''''`´]s\b/g, '')   // strip possessive 's as a unit: "Schwebel's" → "Schwebel"
-    .replace(/['''''`´]/g, '')      // strip any remaining apostrophes
+    .replace(/['''''`´]s\b/g, '')  // "Schwebel's" → "Schwebel"
+    .replace(/['''''`´]/g, '')
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
-    .filter((t) => t.length > 0);
+    .filter(Boolean);
 }
 
-/** First non-suffix token — used as the Zoho search term */
-/** Core tokens: strip all stop words (articles + corp suffixes) */
 function coreTokens(name: string): string[] {
-  const tokens = rawTokens(name).filter((t) => !STOP_WORDS.has(t));
-  return tokens.length > 0 ? tokens : rawTokens(name);
+  const t = rawTokens(name).filter((w) => !STOP_WORDS.has(w));
+  return t.length ? t : rawTokens(name);
 }
 
-/** First meaningful token — used as the Zoho search term */
-function searchToken(name: string): string {
-  return coreTokens(name)[0] ?? '';
-}
-
-/** Score how well a Zoho vendor name matches the lead company name (higher = better) */
 function matchScore(lead: string, zohoName: string): number {
-  // Exact raw token match
   if (rawTokens(lead).join(' ') === rawTokens(zohoName).join(' ')) return 100;
-
-  // Same core tokens after stripping stop words
-  // "The Simply Good Foods Company" ↔ "Simply Good Foods" → both → "simply good" → score 90
-  // "Tyson Foods" ↔ "Tyson" → both → "tyson" → score 90
-  const lc = coreTokens(lead);
-  const zc = coreTokens(zohoName);
-  if (lc.length && zc.length && lc.join(' ') === zc.join(' ')) return 90;
-
-  // One core is a prefix of the other
-  const ls = lc.join(' ');
-  const zs = zc.join(' ');
-  if (ls && zs && (ls.startsWith(zs + ' ') || zs.startsWith(ls + ' '))) return 85;
-
+  const lc = coreTokens(lead).join(' ');
+  const zc = coreTokens(zohoName).join(' ');
+  if (lc && zc && lc === zc) return 90;
+  if (lc && zc && (lc.startsWith(zc + ' ') || zc.startsWith(lc + ' '))) return 85;
   return 0;
 }
+
+// ── Vendor index (KV-cached, refreshed every 2 h) ────────────────────────────
+
+const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v2';
+const VENDOR_CACHE_TTL = 60 * 60 * 2; // 2 hours
+
+type VendorStub = { id: string; name: string };
+
+async function fetchOnePage(token: string, page: number): Promise<VendorStub[]> {
+  const res = await fetch(
+    `https://www.zohoapis.com/crm/v3/Vendors?fields=Vendor_Name&per_page=200&page=${page}`,
+    { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: AbortSignal.timeout(12_000) },
+  );
+  if (!res.ok) return [];
+  const data = await res.json();
+  return (data.data ?? []).map((v: Record<string, unknown>) => ({
+    id:   String(v.id ?? ''),
+    name: String(v.Vendor_Name ?? '').trim(),
+  })).filter((v: VendorStub) => v.id && v.name);
+}
+
+async function getVendorIndex(token: string): Promise<VendorStub[]> {
+  // Try cache first
+  const cached = await kv.get<VendorStub[]>(VENDOR_CACHE_KEY);
+  if (cached?.length) {
+    console.log(`[zoho-enrich] vendor cache hit: ${cached.length} vendors`);
+    return cached;
+  }
+
+  // Fetch all pages in parallel batches of 5 to stay well within timeout
+  console.log('[zoho-enrich] cache miss — fetching vendor index');
+  const all: VendorStub[] = [];
+  let page = 1;
+  while (page <= 100) {
+    const batch = await Promise.all(
+      [0, 1, 2, 3, 4].map((i) => fetchOnePage(token, page + i)),
+    );
+    let done = false;
+    for (const page_results of batch) {
+      all.push(...page_results);
+      if (page_results.length < 200) { done = true; break; }
+    }
+    page += 5;
+    if (done) break;
+  }
+
+  console.log(`[zoho-enrich] fetched ${all.length} vendors — caching`);
+  await kv.set(VENDOR_CACHE_KEY, all, { ex: VENDOR_CACHE_TTL });
+  return all;
+}
+
+// ── Field extraction ──────────────────────────────────────────────────────────
+
+function pickStr(v: unknown): string {
+  if (!v) return '';
+  if (typeof v === 'string') return v.trim();
+  if (typeof v === 'object' && v !== null && 'name' in v)
+    return String((v as Record<string, unknown>).name).trim();
+  return '';
+}
+
+async function fetchVendorFields(
+  token: string,
+  id: string,
+): Promise<{ boughtManager: string; vendorOriginatorByName: string }> {
+  const res = await fetch(`https://www.zohoapis.com/crm/v3/Vendors/${id}`, {
+    headers: { Authorization: `Zoho-oauthtoken ${token}` },
+    signal: AbortSignal.timeout(8_000),
+  });
+  if (!res.ok) return { boughtManager: 'None', vendorOriginatorByName: 'None' };
+  const data = await res.json();
+  const r: Record<string, unknown> = data.data?.[0] ?? data;
+  return {
+    boughtManager:          pickStr(r['Vendor_manager'])            || 'None',
+    vendorOriginatorByName: pickStr(r['Vendor_Originator_By_Name']) || 'None',
+  };
+}
+
+// ── Concurrency helper ────────────────────────────────────────────────────────
+
+async function pMap<T, R>(items: T[], fn: (x: T) => Promise<R>, limit: number): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let idx = 0;
+  const worker = async () => { while (idx < items.length) { const i = idx++; results[i] = await fn(items[i]); } };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+// ── Main handler ─────────────────────────────────────────────────────────────
 
 export interface ZohoMatch {
   found: boolean;
@@ -92,102 +156,51 @@ export interface ZohoMatch {
   vendorOriginatorByName: string;
 }
 
-// Search Zoho for a single company; returns null if not found
-async function searchVendor(
-  token: string,
-  company: string,
-): Promise<{ boughtManager: string; vendorOriginatorByName: string } | null> {
-  const term = searchToken(company);
-  if (!term || term.length < 2) return null;
-
-  // Build URL manually — URLSearchParams encodes ( ) : which Zoho requires as raw chars
-  const url = `https://www.zohoapis.com/crm/v3/Vendors/search` +
-    `?criteria=(Vendor_Name:contains:${encodeURIComponent(term)})` +
-    `&fields=Vendor_Name,Vendor_DBA,Vendor_manager,Vendor_Originator_By_Name` +
-    `&per_page=10`;
-
-  const res = await fetch(url, {
-    headers: { Authorization: `Zoho-oauthtoken ${token}` },
-    signal: AbortSignal.timeout(8_000),
-  });
-
-  if (res.status === 204) return null; // no results
-  if (!res.ok) {
-    const body = await res.text();
-    console.warn('[zoho-enrich] search failed for', company, '| term:', term, '| status:', res.status, '| body:', body);
-    return null;
-  }
-
-  const data = await res.json();
-  const candidates: Array<Record<string, unknown>> = data.data ?? [];
-  if (!candidates.length) return null;
-
-  // Score each candidate against the lead company name
-  // Also split on "/" (DBA entries) to check all name variants
-  let best: { score: number; record: Record<string, unknown> } | null = null;
-
-  for (const record of candidates) {
-    const vendorName = String(record['Vendor_Name'] ?? '');
-    const vendorDBA  = String(record['Vendor_DBA']  ?? '');
-
-    // All name variants this record represents
-    const nameVariants = [vendorName, vendorDBA]
-      .flatMap((n) => n.split('/').map((s) => s.trim()))
-      .filter(Boolean);
-
-    const score = Math.max(...nameVariants.map((n) => matchScore(company, n)));
-
-    if (score > 0 && (!best || score > best.score)) {
-      best = { score, record };
-    }
-  }
-
-  if (!best || best.score < 80) return null;
-
-  return {
-    boughtManager:          pickStr(best.record['Vendor_manager'])             || 'None',
-    vendorOriginatorByName: pickStr(best.record['Vendor_Originator_By_Name'])  || 'None',
-  };
-}
-
-// Run at most `limit` promises concurrently
-async function pMap<T, R>(
-  items: T[],
-  fn: (item: T) => Promise<R>,
-  limit: number,
-): Promise<R[]> {
-  const results: R[] = new Array(items.length);
-  let idx = 0;
-  async function worker() {
-    while (idx < items.length) {
-      const i = idx++;
-      results[i] = await fn(items[i]);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
-}
-
 export async function POST(req: NextRequest) {
   try {
     const { companies }: { companies: string[] } = await req.json();
     if (!companies?.length) return NextResponse.json({});
 
-    const token = await getToken();
-    const unique = [...new Set(companies)];
+    const token  = await getToken();
+    const stubs  = await getVendorIndex(token);
 
-    // Search Zoho for each company, up to 8 concurrent requests
-    const matches = await pMap(unique, (company) => searchVendor(token, company), 8);
+    // Build index — each Zoho name may have "/" variants
+    type Entry = { id: string; variants: string[] };
+    const entries: Entry[] = stubs.map(({ id, name }) => ({
+      id,
+      variants: name.split(/\s*\/\s*|\bDBA\b/i).map((s) => s.trim()).filter(Boolean),
+    }));
 
+    // Match each company
+    const matchedIds = new Map<string, string>(); // company → vendor id
+    for (const company of companies) {
+      let best = { score: 0, id: '' };
+      for (const { id, variants } of entries) {
+        const score = Math.max(...variants.map((v) => matchScore(company, v)));
+        if (score > best.score) best = { score, id };
+      }
+      if (best.score >= 80) matchedIds.set(company, best.id);
+    }
+
+    console.log(`[zoho-enrich] ${companies.length} companies → ${matchedIds.size} matched`);
+
+    // Fetch custom fields for unique matched IDs (parallel, limit 8)
+    const uniqueIds = [...new Set(matchedIds.values())];
+    const fieldResults = await pMap(uniqueIds, (id) => fetchVendorFields(token, id), 8);
+    const fieldMap = new Map(uniqueIds.map((id, i) => [id, fieldResults[i]]));
+
+    // Build response
     const result: Record<string, ZohoMatch> = {};
-    unique.forEach((company, i) => {
-      const m = matches[i];
-      result[company] = m
-        ? { found: true, ...m }
-        : { found: false, boughtManager: '', vendorOriginatorByName: '' };
-    });
+    for (const company of companies) {
+      const id = matchedIds.get(company);
+      if (id) {
+        const fields = fieldMap.get(id)!;
+        result[company] = { found: true, ...fields };
+      } else {
+        result[company] = { found: false, boughtManager: '', vendorOriginatorByName: '' };
+      }
+    }
 
-    console.log(`[zoho-enrich] ${unique.length} companies → ${matches.filter(Boolean).length} matched`);
     return NextResponse.json(result);
   } catch (err) {
     console.error('[zoho-enrich]', err);
