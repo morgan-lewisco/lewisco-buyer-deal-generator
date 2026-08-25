@@ -30,13 +30,18 @@ function pickStr(v: unknown): string {
   return '';
 }
 
-const CORP_SUFFIXES = new Set([
+// Words stripped when building core tokens for comparison and search
+const STOP_WORDS = new Set([
+  // articles / prepositions (causes "The Simply Good Foods" to not match "Simply Good Foods")
+  'the', 'a', 'an', 'of', 'and',
+  // corporate suffixes
   'inc', 'co', 'corp', 'llc', 'ltd', 'lp', 'plc',
   'company', 'corporation', 'incorporated', 'limited',
   'foods', 'food', 'baking', 'brands', 'brand', 'group',
   'international', 'industries', 'industry', 'products',
   'enterprises', 'holdings', 'solutions', 'services',
   'farms', 'distribution', 'distributing', 'wholesale',
+  'natural', 'nutrition', 'health', 'wellness',
 ]);
 
 function rawTokens(name: string): string[] {
@@ -50,32 +55,33 @@ function rawTokens(name: string): string[] {
 }
 
 /** First non-suffix token — used as the Zoho search term */
+/** Core tokens: strip all stop words (articles + corp suffixes) */
+function coreTokens(name: string): string[] {
+  const tokens = rawTokens(name).filter((t) => !STOP_WORDS.has(t));
+  return tokens.length > 0 ? tokens : rawTokens(name);
+}
+
+/** First meaningful token — used as the Zoho search term */
 function searchToken(name: string): string {
-  const tokens = rawTokens(name);
-  const meaningful = tokens.filter((t) => !CORP_SUFFIXES.has(t));
-  return (meaningful.length > 0 ? meaningful : tokens)[0] ?? '';
+  return coreTokens(name)[0] ?? '';
 }
 
 /** Score how well a Zoho vendor name matches the lead company name (higher = better) */
 function matchScore(lead: string, zohoName: string): number {
-  const lt = rawTokens(lead);
-  const zt = rawTokens(zohoName);
+  // Exact raw token match
+  if (rawTokens(lead).join(' ') === rawTokens(zohoName).join(' ')) return 100;
 
-  // Exact token-set match
-  if (lt.join(' ') === zt.join(' ')) return 100;
-
-  // Both reduce to same core after stripping suffixes
-  const lc = lt.filter((t) => !CORP_SUFFIXES.has(t));
-  const zc = zt.filter((t) => !CORP_SUFFIXES.has(t));
+  // Same core tokens after stripping stop words
+  // "The Simply Good Foods Company" ↔ "Simply Good Foods" → both → "simply good" → score 90
+  // "Tyson Foods" ↔ "Tyson" → both → "tyson" → score 90
+  const lc = coreTokens(lead);
+  const zc = coreTokens(zohoName);
   if (lc.length && zc.length && lc.join(' ') === zc.join(' ')) return 90;
 
-  // First meaningful token matches
-  if (lc[0] && zc[0] && lc[0] === zc[0]) return 70;
-
-  // One name contains the other (handles "Tyson" ↔ "Tyson Foods")
-  const ls = lt.join(' ');
-  const zs = zt.join(' ');
-  if (ls.startsWith(zs + ' ') || zs.startsWith(ls + ' ') || ls === zs) return 80;
+  // One core is a prefix of the other
+  const ls = lc.join(' ');
+  const zs = zc.join(' ');
+  if (ls && zs && (ls.startsWith(zs + ' ') || zs.startsWith(ls + ' '))) return 85;
 
   return 0;
 }
@@ -96,7 +102,7 @@ async function searchVendor(
 
   // Build URL manually — URLSearchParams encodes ( ) : which Zoho requires as raw chars
   const url = `https://www.zohoapis.com/crm/v3/Vendors/search` +
-    `?criteria=(Vendor_Name:starts_with:${encodeURIComponent(term)})` +
+    `?criteria=(Vendor_Name:contains:${encodeURIComponent(term)})` +
     `&fields=Vendor_Name,Vendor_DBA,Vendor_manager,Vendor_Originator_By_Name` +
     `&per_page=10`;
 
