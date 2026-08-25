@@ -93,22 +93,21 @@ async function searchVendor(
   const term = searchToken(company);
   if (!term || term.length < 2) return null;
 
-  // Zoho also stores DBA names in Vendor_DBA — search that too
-  const criteria = `(Vendor_Name:contains:${term})`;
-  const params = new URLSearchParams({
-    criteria,
-    fields: 'Vendor_Name,Vendor_DBA,Vendor_manager,Vendor_Originator_By_Name',
-    per_page: '10',
-  });
+  // Build URL manually — URLSearchParams encodes ( ) : which Zoho requires as raw chars
+  const url = `https://www.zohoapis.com/crm/v3/Vendors/search` +
+    `?criteria=(Vendor_Name:starts_with:${encodeURIComponent(term)})` +
+    `&fields=Vendor_Name,Vendor_DBA,Vendor_manager,Vendor_Originator_By_Name` +
+    `&per_page=10`;
 
-  const res = await fetch(`https://www.zohoapis.com/crm/v3/Vendors/search?${params}`, {
+  const res = await fetch(url, {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
     signal: AbortSignal.timeout(8_000),
   });
 
   if (res.status === 204) return null; // no results
   if (!res.ok) {
-    console.warn('[zoho-enrich] search failed for', company, res.status, await res.text());
+    const body = await res.text();
+    console.warn('[zoho-enrich] search failed for', company, '| term:', term, '| status:', res.status, '| body:', body);
     return null;
   }
 
