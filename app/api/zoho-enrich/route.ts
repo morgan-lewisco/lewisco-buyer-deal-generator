@@ -29,10 +29,44 @@ function pickStr(v: unknown): string {
   return '';
 }
 
+// Corporate suffixes stripped before first-word comparison
+const CORP_SUFFIXES = new Set([
+  'inc', 'co', 'corp', 'llc', 'ltd', 'lp', 'plc',
+  'company', 'corporation', 'incorporated', 'limited',
+  'foods', 'food', 'baking', 'brands', 'brand', 'group',
+  'international', 'industries', 'industry', 'products',
+  'enterprises', 'holdings', 'solutions', 'services',
+]);
+
+/**
+ * Normalize a vendor name for matching:
+ *  - strip possessives ("Schwebel's" → "schwbels" ugh — actually strip the 's)
+ *  - lowercase, remove punctuation
+ *  - drop common corporate suffixes
+ *  - return tokens
+ */
+function tokenize(name: string): string[] {
+  return name
+    .toLowerCase()
+    // strip possessives: "Schwebel's" → "Schwebels", "Tyson's" → "Tysons"
+    .replace(/['''‘’]s\b/g, '')
+    // strip trailing possessive apostrophe without s: "Kelloggs'" → "Kelloggs"
+    .replace(/['''‘’]$/g, '')
+    // keep only letters, numbers, spaces
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length > 0 && !CORP_SUFFIXES.has(t));
+}
+
+function firstToken(name: string): string {
+  return tokenize(name)[0] ?? '';
+}
+
 export interface ZohoMatch {
   found: boolean;
-  boughtManager: string;          // 'None' if field empty, '' if vendor not found
-  vendorOriginatorByName: string; // same
+  boughtManager: string;
+  vendorOriginatorByName: string;
+  matchType?: 'exact' | 'first-word'; // for debugging
 }
 
 export async function POST(req: NextRequest) {
@@ -42,9 +76,13 @@ export async function POST(req: NextRequest) {
 
     const token = await getToken();
 
-    // Fetch all vendors with both fields (up to 2000 records, 10 pages × 200)
     type VendorRow = { boughtManager: string; vendorOriginatorByName: string };
-    const vendorMap = new Map<string, VendorRow>();
+
+    // Two indexes built while paginating:
+    //  exactMap  — normalized full name → data
+    //  firstWordMap — first meaningful token → data (first writer wins; prefer longer names)
+    const exactMap     = new Map<string, VendorRow>();
+    const firstWordMap = new Map<string, VendorRow>();
 
     for (let page = 1; page <= 10; page++) {
       const params = new URLSearchParams({
@@ -62,30 +100,53 @@ export async function POST(req: NextRequest) {
       }
       const data = await res.json();
       const vendors: Array<Record<string, unknown>> = data.data ?? [];
+
       for (const v of vendors) {
-        const name = String(v.Vendor_Name ?? '').trim().toLowerCase();
-        if (name) {
-          vendorMap.set(name, {
-            boughtManager:          pickStr(v.Bought_Manager),
-            vendorOriginatorByName: pickStr(v.Vendor_Originator_By_Name),
-          });
+        const raw = String(v.Vendor_Name ?? '').trim();
+        if (!raw) continue;
+
+        const row: VendorRow = {
+          boughtManager:          pickStr(v.Bought_Manager),
+          vendorOriginatorByName: pickStr(v.Vendor_Originator_By_Name),
+        };
+
+        // Exact key: lowercased raw name
+        exactMap.set(raw.toLowerCase(), row);
+
+        // First-word key: first meaningful token (min 4 chars to avoid false positives)
+        const fw = firstToken(raw);
+        if (fw.length >= 4 && !firstWordMap.has(fw)) {
+          firstWordMap.set(fw, row);
         }
       }
+
       if (vendors.length < 200) break;
     }
 
-    console.log(`[zoho-enrich] ${vendorMap.size} vendors indexed`);
+    console.log(`[zoho-enrich] ${exactMap.size} vendors indexed (${firstWordMap.size} first-word keys)`);
 
-    // Match each requested company name
     const result: Record<string, ZohoMatch> = {};
+
     for (const company of companies) {
-      const key = company.trim().toLowerCase();
-      const match = vendorMap.get(key);
+      // Pass 1 — exact match
+      let match = exactMap.get(company.trim().toLowerCase());
+      let matchType: 'exact' | 'first-word' | undefined = match ? 'exact' : undefined;
+
+      // Pass 2 — first-word fallback (min 4 chars)
+      if (!match) {
+        const fw = firstToken(company);
+        if (fw.length >= 4) {
+          match = firstWordMap.get(fw);
+          if (match) matchType = 'first-word';
+        }
+      }
+
       if (match) {
         result[company] = {
           found: true,
           boughtManager:          match.boughtManager          || 'None',
           vendorOriginatorByName: match.vendorOriginatorByName || 'None',
+          matchType,
         };
       } else {
         result[company] = { found: false, boughtManager: '', vendorOriginatorByName: '' };
