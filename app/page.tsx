@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Lead, LeadStatus } from '@/lib/types';
+import { Lead, LeadStatus, ZohoMatch } from '@/lib/types';
 import { accumulateLeads, updateLeadStatus, updateLeadAssignment, updateLeadDeal } from '@/lib/persistence';
 import LeadList from './components/LeadList';
 import AddLeadModal from './components/AddLeadModal';
@@ -25,9 +25,23 @@ export default function AdminPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'contacted' | 'deals'>('all');
   const [personFilter, setPersonFilter] = useState<'all' | 'unassigned' | 'assigned' | string>('all');
+  const [zohoMap, setZohoMap]           = useState<Record<string, ZohoMatch>>({});
 
   // Save debounce — avoid hammering KV on rapid status/assignment changes
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const enrichZoho = useCallback((pool: Lead[]) => {
+    if (!pool.length) return;
+    const companies = [...new Set(pool.map((l) => l.company))];
+    fetch('/api/zoho-enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ companies }),
+    })
+      .then((r) => r.json())
+      .then((map: Record<string, ZohoMatch>) => setZohoMap(map))
+      .catch(console.error);
+  }, []);
 
   // Load pool from server on mount
   useEffect(() => {
@@ -38,11 +52,12 @@ export default function AdminPage() {
           setLeads(state.leads);
           setGeneratedAt(state.generatedAt ?? null);
           setStatus('done');
+          enrichZoho(state.leads);
         }
       })
       .catch(console.error)
       .finally(() => setPoolLoading(false));
-  }, []);
+  }, [enrichZoho]);
 
   // Persist pool to server whenever leads change (debounced 800ms)
   const persistPool = useCallback((nextLeads: Lead[], nextGeneratedAt: string | null) => {
@@ -85,6 +100,7 @@ export default function AdminPage() {
       setGeneratedAt(result.generatedAt);
       setMeta({ searches: result.searchesRun, signals: result.rawSignalsFound, deduped: result.zohoDeduped });
       setStatus('done');
+      setLeads((current) => { enrichZoho(current); return current; });
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Unknown error');
       setStatus('error');
@@ -280,6 +296,7 @@ export default function AdminPage() {
             onGenerate={handleGenerate}
             isLoading={isLoading}
             genLabel={STATUS_LABEL[status]}
+            zohoMap={zohoMap}
           />
         )}
       </main>

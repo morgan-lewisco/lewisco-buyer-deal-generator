@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Lead, LeadStatus } from '@/lib/types';
+import { Lead, LeadStatus, ZohoMatch } from '@/lib/types';
 import { BUYER_NAMES } from '@/lib/buyers';
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
   onUndoDismiss: (id: string) => void;
   onAssign: (id: string, name: string) => void;
   onDeal: (id: string, dealMade: boolean, dealNotes: string) => void;
+  zohoData?: ZohoMatch;
 }
 
 const SIGNAL_CONFIG: Record<string, { label: string; className: string }> = {
@@ -55,7 +56,7 @@ function val(s?: string): string {
 }
 
 
-export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign, onDeal }: Props) {
+export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign, onDeal, zohoData }: Props) {
   const isContacted = lead.status === 'contacted';
   const isDismissed = lead.status === 'dismissed';
   const [showDealForm, setShowDealForm] = useState(false);
@@ -231,6 +232,26 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
 
         {/* Controls */}
         <div className="flex flex-shrink-0 flex-col items-end gap-2">
+          {/* Zoho CRM info */}
+          {zohoData !== undefined && (
+            <div className="text-right text-xs leading-snug">
+              {!zohoData.found ? (
+                <span className="text-slate-400 italic">Vendor not in Zoho</span>
+              ) : (
+                <div className="space-y-0.5">
+                  <div className="text-slate-500">
+                    <span className="font-medium text-slate-600">Bought Manager:</span>{' '}
+                    <span className={zohoData.boughtManager === 'None' ? 'text-slate-400 italic' : 'text-slate-700'}>{zohoData.boughtManager}</span>
+                  </div>
+                  <div className="text-slate-500">
+                    <span className="font-medium text-slate-600">Originated By:</span>{' '}
+                    <span className={zohoData.vendorOriginatorByName === 'None' ? 'text-slate-400 italic' : 'text-slate-700'}>{zohoData.vendorOriginatorByName}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Assignment dropdown */}
           <select
             value={lead.assignedTo ?? ''}

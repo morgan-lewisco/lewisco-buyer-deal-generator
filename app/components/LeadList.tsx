@@ -1,6 +1,6 @@
 'use client';
 import { useState } from 'react';
-import { Lead, LeadStatus } from '@/lib/types';
+import { Lead, LeadStatus, ZohoMatch } from '@/lib/types';
 import { BUYER_NAMES } from '@/lib/buyers';
 import LeadCard from './LeadCard';
 
@@ -18,11 +18,12 @@ interface Props {
   onGenerate: () => void;
   isLoading: boolean;
   genLabel: string;
+  zohoMap: Record<string, ZohoMatch>;
 }
 
 export default function LeadList({
   leads, statusFilter, personFilter, onPersonFilter,
-  onUpdateStatus, onAssign, onDeal, onGenerate, isLoading, genLabel,
+  onUpdateStatus, onAssign, onDeal, onGenerate, isLoading, genLabel, zohoMap,
 }: Props) {
   const [showDismissed, setShowDismissed] = useState(true);
 
@@ -99,7 +100,8 @@ export default function LeadList({
           {visible.map((lead, i) => (
             <LeadCard key={lead.id} lead={lead} rank={i + 1}
               onContact={handleContact} onDismiss={handleDismiss}
-              onUndoDismiss={handleUndoDismiss} onAssign={onAssign} onDeal={onDeal} />
+              onUndoDismiss={handleUndoDismiss} onAssign={onAssign} onDeal={onDeal}
+              zohoData={zohoMap[lead.company]} />
           ))}
         </div>
       )}

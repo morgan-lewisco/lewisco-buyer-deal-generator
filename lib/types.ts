@@ -73,6 +73,12 @@ export interface BuyerState {
   statusOverrides: Record<string, LeadStatus>;
 }
 
+export interface ZohoMatch {
+  found: boolean;
+  boughtManager: string;
+  vendorOriginatorByName: string;
+}
+
 export interface PoolState {
   leads: Lead[];
   generatedAt: string | null;
