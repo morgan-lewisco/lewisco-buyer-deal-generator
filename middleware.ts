@@ -6,8 +6,8 @@ const TOKEN = 'lewisco-auth-2026';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Always allow login page and auth API
-  if (pathname.startsWith('/login') || pathname.startsWith('/api/auth')) {
+  // Always allow login page, auth API, and internal debug endpoint
+  if (pathname.startsWith('/login') || pathname.startsWith('/api/auth') || pathname.startsWith('/api/zoho-debug')) {
     return NextResponse.next();
   }
 
