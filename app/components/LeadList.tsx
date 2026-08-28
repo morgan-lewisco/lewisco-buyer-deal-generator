@@ -4,7 +4,7 @@ import { Lead, LeadStatus, ZohoMatch } from '@/lib/types';
 import { BUYER_NAMES } from '@/lib/buyers';
 import LeadCard from './LeadCard';
 
-export type StatusFilter = 'all' | 'active' | 'contacted' | 'deals';
+export type StatusFilter = 'all' | 'active' | 'contacted' | 'deals' | 'currently-active';
 export type PersonFilter = 'all' | 'unassigned' | 'assigned' | string;
 
 interface Props {
@@ -16,6 +16,7 @@ interface Props {
   onAssign: (id: string, name: string) => void;
   onDeal: (id: string, dealMade: boolean, dealNotes: string) => void;
   onNotes: (id: string, notes: string) => void;
+  onCurrentlyActive: (id: string, active: boolean) => void;
   onGenerate: () => void;
   isLoading: boolean;
   genLabel: string;
@@ -25,7 +26,7 @@ interface Props {
 
 export default function LeadList({
   leads, statusFilter, personFilter, onPersonFilter,
-  onUpdateStatus, onAssign, onDeal, onNotes, onGenerate, isLoading, genLabel, zohoMap, onZohoLink,
+  onUpdateStatus, onAssign, onDeal, onNotes, onCurrentlyActive, onGenerate, isLoading, genLabel, zohoMap, onZohoLink,
 }: Props) {
   const [showDismissed, setShowDismissed] = useState(true);
 
@@ -36,11 +37,16 @@ export default function LeadList({
     return pool.filter((l) => l.assignedTo === personFilter);
   }
 
+  function isLeadCurrentlyActive(l: Lead): boolean {
+    return !!(l.currentlyActive || (zohoMap[l.company]?.found && zohoMap[l.company]?.boughtManager && zohoMap[l.company]?.boughtManager !== 'None'));
+  }
+
   function byStatus(pool: Lead[]): Lead[] {
     if (statusFilter === 'all') return pool;
     if (statusFilter === 'active') return pool.filter((l) => l.status !== 'contacted' && !l.dealMade);
     if (statusFilter === 'contacted') return pool.filter((l) => l.status === 'contacted' && !l.dealMade);
     if (statusFilter === 'deals') return pool.filter((l) => !!l.dealMade);
+    if (statusFilter === 'currently-active') return pool.filter(isLeadCurrentlyActive);
     return pool;
   }
 
@@ -101,7 +107,8 @@ export default function LeadList({
             <LeadCard key={lead.id} lead={lead} rank={i + 1}
               onContact={handleContact} onDismiss={handleDismiss}
               onUndoDismiss={handleUndoDismiss} onAssign={onAssign} onDeal={onDeal}
-              onNotes={onNotes} zohoData={zohoMap[lead.company]} onZohoLink={onZohoLink} />
+              onNotes={onNotes} onCurrentlyActive={onCurrentlyActive}
+              zohoData={zohoMap[lead.company]} onZohoLink={onZohoLink} />
           ))}
         </div>
       )}

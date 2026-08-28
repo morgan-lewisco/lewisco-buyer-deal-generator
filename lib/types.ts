@@ -30,6 +30,7 @@ export interface Lead {
   dealMade?: boolean;
   dealNotes?: string;
   adminNotes?: string;
+  currentlyActive?: boolean; // manually marked as existing CRM account (overrides auto-detection)
 }
 
 export interface SignalEvent {

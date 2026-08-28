@@ -12,6 +12,7 @@ interface Props {
   onAssign: (id: string, name: string) => void;
   onDeal: (id: string, dealMade: boolean, dealNotes: string) => void;
   onNotes: (id: string, notes: string) => void;
+  onCurrentlyActive: (id: string, active: boolean) => void;
   zohoData?: ZohoMatch;
   onZohoLink?: (company: string, match: ZohoMatch | null) => void;
 }
@@ -58,11 +59,11 @@ function val(s?: string): string {
 }
 
 
-export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign, onDeal, onNotes, zohoData, onZohoLink }: Props) {
+export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign, onDeal, onNotes, onCurrentlyActive, zohoData, onZohoLink }: Props) {
   const isContacted = lead.status === 'contacted';
   const isDismissed = lead.status === 'dismissed';
-  // "Currently Active" = company already exists in Zoho under an active buyer manager
-  const isCurrentlyActive = !!(zohoData?.found && zohoData.boughtManager && zohoData.boughtManager !== 'None');
+  // "Currently Active" = existing CRM account (manual flag OR auto-detected from Zoho)
+  const isCurrentlyActive = !!(lead.currentlyActive || (zohoData?.found && zohoData.boughtManager && zohoData.boughtManager !== 'None'));
   const [showDealForm, setShowDealForm]   = useState(false);
   const [draftNotes, setDraftNotes]       = useState(lead.dealNotes ?? '');
   const [adminNotes, setAdminNotes]       = useState(lead.adminNotes ?? '');
@@ -397,6 +398,16 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
               }`}
               title="Mark as deal made">
               🤝 Deal
+            </button>
+            <button
+              onClick={() => onCurrentlyActive(lead.id, !lead.currentlyActive)}
+              className={`rounded px-2 py-1 text-xs font-semibold border transition ${
+                lead.currentlyActive
+                  ? 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-50'
+                  : 'bg-white text-slate-400 border-slate-200 hover:border-blue-300 hover:text-blue-600'
+              }`}
+              title={lead.currentlyActive ? 'Remove currently active flag' : 'Mark as currently active CRM account'}>
+              🔄 Active
             </button>
             <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Mark contacted">
               <input type="checkbox" checked={isContacted}

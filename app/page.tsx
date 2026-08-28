@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Lead, LeadStatus, ZohoMatch } from '@/lib/types';
-import { accumulateLeads, updateLeadStatus, updateLeadAssignment, updateLeadDeal, updateLeadNotes } from '@/lib/persistence';
+import { accumulateLeads, updateLeadStatus, updateLeadAssignment, updateLeadDeal, updateLeadNotes, updateLeadCurrentlyActive } from '@/lib/persistence';
 import LeadList from './components/LeadList';
 import AddLeadModal from './components/AddLeadModal';
 
@@ -23,7 +23,7 @@ export default function AdminPage() {
   const [meta, setMeta]               = useState<{ searches: number; signals: number; deduped: boolean } | null>(null);
   const [poolLoading, setPoolLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'contacted' | 'deals'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'contacted' | 'deals' | 'currently-active'>('all');
   const [personFilter, setPersonFilter] = useState<'all' | 'unassigned' | 'assigned' | string>('all');
   const [zohoMap, setZohoMap]           = useState<Record<string, ZohoMatch>>({});
 
@@ -125,6 +125,14 @@ export default function AdminPage() {
     });
   }, [generatedAt, persistPool]);
 
+  const handleCurrentlyActive = useCallback((id: string, active: boolean) => {
+    setLeads((prev) => {
+      const next = updateLeadCurrentlyActive(prev, id, active);
+      persistPool(next, generatedAt);
+      return next;
+    });
+  }, [generatedAt, persistPool]);
+
   const handleNotes = useCallback((id: string, notes: string) => {
     setLeads((prev) => {
       const next = updateLeadNotes(prev, id, notes);
@@ -171,12 +179,15 @@ export default function AdminPage() {
     window.location.href = '/login';
   }
 
-  const isLoading       = status === 'searching' || status === 'scoring';
-  const totalLeads      = leads.length;
-  const assignedCount   = leads.filter((l) => l.assignedTo).length;
-  const contactedCount  = leads.filter((l) => l.status === 'contacted' && !l.dealMade).length;
-  const unassignedCount = leads.filter((l) => !l.assignedTo && l.status !== 'contacted').length;
-  const dealCount       = leads.filter((l) => l.dealMade).length;
+  const isLoading            = status === 'searching' || status === 'scoring';
+  const totalLeads           = leads.length;
+  const assignedCount        = leads.filter((l) => l.assignedTo).length;
+  const contactedCount       = leads.filter((l) => l.status === 'contacted' && !l.dealMade).length;
+  const unassignedCount      = leads.filter((l) => !l.assignedTo && l.status !== 'contacted').length;
+  const dealCount            = leads.filter((l) => l.dealMade).length;
+  const currentlyActiveCount = leads.filter((l) =>
+    l.currentlyActive || (zohoMap[l.company]?.found && zohoMap[l.company]?.boughtManager && zohoMap[l.company]?.boughtManager !== 'None')
+  ).length;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -234,14 +245,16 @@ export default function AdminPage() {
               { label: 'Unassigned',  value: unassignedCount, num: 'text-orange-500',  ring: 'ring-orange-400',  onClick: () => { setStatusFilter('all');       setPersonFilter('unassigned'); } },
               { label: 'Assigned',    value: assignedCount,   num: 'text-indigo-600',  ring: 'ring-indigo-400',  onClick: () => { setStatusFilter('all');       setPersonFilter('assigned'); } },
               { label: 'Engaged',     value: contactedCount,  num: 'text-emerald-600', ring: 'ring-emerald-400', onClick: () => { setStatusFilter('contacted'); setPersonFilter('all'); } },
-              { label: 'Deals Made',  value: dealCount,       num: 'text-yellow-500',  ring: 'ring-yellow-400',  onClick: () => { setStatusFilter('deals');     setPersonFilter('all'); } },
+              { label: 'Deals Made',       value: dealCount,            num: 'text-yellow-500',  ring: 'ring-yellow-400',  onClick: () => { setStatusFilter('deals');            setPersonFilter('all'); } },
+              { label: 'Currently Active', value: currentlyActiveCount, num: 'text-blue-600',    ring: 'ring-blue-400',    onClick: () => { setStatusFilter('currently-active'); setPersonFilter('all'); } },
             ] as const).map(({ label, value, num, ring, onClick }) => {
               const isActive =
-                (label === 'Total Leads' && statusFilter === 'all' && personFilter === 'all') ||
-                (label === 'Unassigned'  && personFilter === 'unassigned') ||
-                (label === 'Assigned'    && personFilter === 'assigned') ||
-                (label === 'Engaged'     && statusFilter === 'contacted' && personFilter === 'all') ||
-                (label === 'Deals Made'  && statusFilter === 'deals');
+                (label === 'Total Leads'      && statusFilter === 'all'              && personFilter === 'all') ||
+                (label === 'Unassigned'       && personFilter === 'unassigned') ||
+                (label === 'Assigned'         && personFilter === 'assigned') ||
+                (label === 'Engaged'          && statusFilter === 'contacted'        && personFilter === 'all') ||
+                (label === 'Deals Made'       && statusFilter === 'deals') ||
+                (label === 'Currently Active' && statusFilter === 'currently-active');
               return (
                 <button key={label} onClick={onClick}
                   className={`rounded-xl bg-white border-2 px-4 py-3 shadow-sm text-center transition cursor-pointer hover:shadow-md ${
@@ -312,6 +325,7 @@ export default function AdminPage() {
             onAssign={handleAssign}
             onDeal={handleDeal}
             onNotes={handleNotes}
+            onCurrentlyActive={handleCurrentlyActive}
             onGenerate={handleGenerate}
             isLoading={isLoading}
             genLabel={STATUS_LABEL[status]}

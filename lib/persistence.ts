@@ -117,6 +117,12 @@ export function updateLeadDeal(leads: Lead[], id: string, dealMade: boolean, dea
   );
 }
 
+export function updateLeadCurrentlyActive(leads: Lead[], id: string, currentlyActive: boolean): Lead[] {
+  return leads.map((l) =>
+    l.id === id ? { ...l, currentlyActive: currentlyActive || undefined } : l
+  );
+}
+
 export function updateLeadNotes(leads: Lead[], id: string, adminNotes: string): Lead[] {
   return leads.map((l) =>
     l.id === id ? { ...l, adminNotes: adminNotes || undefined } : l
