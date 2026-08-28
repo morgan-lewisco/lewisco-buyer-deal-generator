@@ -29,6 +29,7 @@ export interface Lead {
   assignedTo?: AssignedTo;
   dealMade?: boolean;
   dealNotes?: string;
+  adminNotes?: string;
 }
 
 export interface SignalEvent {

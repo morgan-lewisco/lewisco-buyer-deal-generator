@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Lead, LeadStatus, ZohoMatch } from '@/lib/types';
-import { accumulateLeads, updateLeadStatus, updateLeadAssignment, updateLeadDeal } from '@/lib/persistence';
+import { accumulateLeads, updateLeadStatus, updateLeadAssignment, updateLeadDeal, updateLeadNotes } from '@/lib/persistence';
 import LeadList from './components/LeadList';
 import AddLeadModal from './components/AddLeadModal';
 
@@ -120,6 +120,14 @@ export default function AdminPage() {
   const handleUpdateStatus = useCallback((id: string, s: LeadStatus) => {
     setLeads((prev) => {
       const next = updateLeadStatus(prev, id, s);
+      persistPool(next, generatedAt);
+      return next;
+    });
+  }, [generatedAt, persistPool]);
+
+  const handleNotes = useCallback((id: string, notes: string) => {
+    setLeads((prev) => {
+      const next = updateLeadNotes(prev, id, notes);
       persistPool(next, generatedAt);
       return next;
     });
@@ -303,6 +311,7 @@ export default function AdminPage() {
             onUpdateStatus={handleUpdateStatus}
             onAssign={handleAssign}
             onDeal={handleDeal}
+            onNotes={handleNotes}
             onGenerate={handleGenerate}
             isLoading={isLoading}
             genLabel={STATUS_LABEL[status]}

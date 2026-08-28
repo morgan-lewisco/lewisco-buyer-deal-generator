@@ -11,6 +11,7 @@ interface Props {
   onUndoDismiss: (id: string) => void;
   onAssign: (id: string, name: string) => void;
   onDeal: (id: string, dealMade: boolean, dealNotes: string) => void;
+  onNotes: (id: string, notes: string) => void;
   zohoData?: ZohoMatch;
   onZohoLink?: (company: string, match: ZohoMatch | null) => void;
 }
@@ -57,11 +58,13 @@ function val(s?: string): string {
 }
 
 
-export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign, onDeal, zohoData, onZohoLink }: Props) {
+export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign, onDeal, onNotes, zohoData, onZohoLink }: Props) {
   const isContacted = lead.status === 'contacted';
   const isDismissed = lead.status === 'dismissed';
   const [showDealForm, setShowDealForm]   = useState(false);
   const [draftNotes, setDraftNotes]       = useState(lead.dealNotes ?? '');
+  const [adminNotes, setAdminNotes]       = useState(lead.adminNotes ?? '');
+  const notesTimer                        = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showLinkForm, setShowLinkForm]   = useState(false);
   const [linkInput, setLinkInput]         = useState('');
   const [linkLoading, setLinkLoading]     = useState(false);
@@ -154,14 +157,7 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
 
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              {lead.sourceUrl ? (
-                <a href={lead.sourceUrl} target="_blank" rel="noopener noreferrer"
-                   className={`${titleClass} hover:underline`}>
-                  {lead.company}
-                </a>
-              ) : (
-                <span className={titleClass}>{lead.company}</span>
-              )}
+              <span className={titleClass}>{lead.company}</span>
               {lead.dealMade && (
                 <span className="text-xs font-medium text-yellow-800 bg-yellow-200 rounded-full px-2 py-0.5">🤝 Deal Made</span>
               )}
@@ -425,6 +421,22 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
             </a>
           </div>
         </div>
+      </div>
+
+      {/* Admin notes */}
+      <div className="mt-3 pt-3 border-t border-slate-100">
+        <textarea
+          value={adminNotes}
+          onChange={(e) => {
+            const val = e.target.value;
+            setAdminNotes(val);
+            if (notesTimer.current) clearTimeout(notesTimer.current);
+            notesTimer.current = setTimeout(() => onNotes(lead.id, val), 600);
+          }}
+          placeholder="Admin notes…"
+          rows={adminNotes ? Math.max(2, adminNotes.split('\n').length) : 1}
+          className="w-full rounded border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700 placeholder-slate-300 focus:outline-none focus:ring-1 focus:ring-slate-300 resize-none transition-all"
+        />
       </div>
     </div>
   );

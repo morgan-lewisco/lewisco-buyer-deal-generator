@@ -116,3 +116,9 @@ export function updateLeadDeal(leads: Lead[], id: string, dealMade: boolean, dea
     l.id === id ? { ...l, dealMade, dealNotes: dealNotes || undefined } : l
   );
 }
+
+export function updateLeadNotes(leads: Lead[], id: string, adminNotes: string): Lead[] {
+  return leads.map((l) =>
+    l.id === id ? { ...l, adminNotes: adminNotes || undefined } : l
+  );
+}
