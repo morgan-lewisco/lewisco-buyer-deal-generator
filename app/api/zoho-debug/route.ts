@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+
+export const maxDuration = 60;
 import { getZohoToken, getVendorIndex, VENDOR_CACHE_KEY } from '@/lib/zoho-utils';
 import { kv } from '@vercel/kv';
 

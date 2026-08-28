@@ -134,11 +134,13 @@ export async function fetchOnePage(token: string, page: number): Promise<VendorS
 // The search endpoint does NOT have the list API's 10-page/2000-record hard cap.
 async function fetchByPrefix(token: string, prefix: string): Promise<VendorStub[]> {
   const all: VendorStub[] = [];
-  for (let page = 1; page <= 10; page++) {
+  // 2 pages × 200 = 400 vendors per prefix — more than enough per letter for any realistic vendor list.
+  // Keeping this tight ensures the full 36-prefix rebuild completes well within Vercel's 60s timeout.
+  for (let page = 1; page <= 2; page++) {
     const criteria = encodeURIComponent(`(Vendor_Name:starts_with:${prefix})`);
     const res = await fetch(
       `https://www.zohoapis.com/crm/v3/Vendors/search?criteria=${criteria}&fields=id,Vendor_Name&per_page=200&page=${page}`,
-      { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: AbortSignal.timeout(15_000) },
+      { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: AbortSignal.timeout(10_000) },
     );
     if (!res.ok) break;
     const data = await res.json();
@@ -163,7 +165,7 @@ export async function getVendorIndex(token: string): Promise<VendorStub[]> {
   // Runs 36 prefix queries (0-9 + A-Z) in parallel batches of 6.
   console.log('[zoho] cache miss — rebuilding vendor index via alphabetical search');
   const prefixes = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  const prefixResults = await pMap(prefixes, (p) => fetchByPrefix(token, p), 6);
+  const prefixResults = await pMap(prefixes, (p) => fetchByPrefix(token, p), 12);
 
   // Deduplicate by ID (a vendor starting with "Co" hits both prefix scans if names overlap)
   const byId = new Map<string, VendorStub>();
