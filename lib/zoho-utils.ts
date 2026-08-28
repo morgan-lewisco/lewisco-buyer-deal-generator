@@ -70,7 +70,7 @@ export function matchScore(lead: string, zohoName: string): number {
 
 // ── Vendor index (KV-cached) ──────────────────────────────────────────────────
 
-export const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v6';
+export const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v7';
 export const VENDOR_CACHE_TTL = 60 * 60 * 2; // 2 hours
 
 export type VendorStub = { id: string; name: string };
@@ -86,21 +86,44 @@ function extractVendorName(v: Record<string, unknown>): string {
   return String(raw).trim();
 }
 
+// Fetch one batch via COQL (bypasses the 2000-record page limit of the list endpoint)
+export async function fetchOnePageCOQL(token: string, offset: number): Promise<{ stubs: VendorStub[]; more: boolean }> {
+  const query = `select id, Vendor_Name from Vendors limit 200 offset ${offset}`;
+  const res = await fetch(
+    'https://www.zohoapis.com/crm/v3/coql',
+    {
+      method: 'POST',
+      headers: { Authorization: `Zoho-oauthtoken ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ select_query: query }),
+      signal: AbortSignal.timeout(12_000),
+    },
+  );
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    console.warn(`[zoho] COQL offset ${offset} failed: ${res.status} — ${text.slice(0, 200)}`);
+    return { stubs: [], more: false };
+  }
+  const data = await res.json();
+  if (offset === 0 && data.data?.[0]) {
+    console.log(`[zoho] COQL sample keys: ${Object.keys(data.data[0]).join(', ')}`);
+    console.log(`[zoho] COQL first record: ${JSON.stringify(data.data[0])}`);
+  }
+  const stubs = (data.data ?? []).map((v: Record<string, unknown>) => ({
+    id:   String(v.id ?? ''),
+    name: extractVendorName(v),
+  })).filter((v: VendorStub) => v.id && v.name);
+  const more: boolean = data.info?.more_records === true;
+  return { stubs, more };
+}
+
+// Kept for the debug endpoint — plain list-API fetch, subject to the 2000-record cap
 export async function fetchOnePage(token: string, page: number): Promise<VendorStub[]> {
-  // Request id + Vendor_Name explicitly; id is always returned even if not listed
   const res = await fetch(
     `https://www.zohoapis.com/crm/v3/Vendors?fields=id,Vendor_Name,Name&per_page=200&page=${page}`,
     { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: AbortSignal.timeout(12_000) },
   );
-  if (!res.ok) {
-    console.warn(`[zoho] page ${page} failed: ${res.status}`);
-    return [];
-  }
+  if (!res.ok) return [];
   const data = await res.json();
-  if (page === 1 && data.data?.[0]) {
-    console.log(`[zoho] page 1 raw keys: ${Object.keys(data.data[0]).join(', ')}`);
-    console.log(`[zoho] page 1 first record: ${JSON.stringify(data.data[0])}`);
-  }
   return (data.data ?? []).map((v: Record<string, unknown>) => ({
     id:   String(v.id ?? ''),
     name: extractVendorName(v),
@@ -113,24 +136,28 @@ export async function getVendorIndex(token: string): Promise<VendorStub[]> {
     console.log(`[zoho] vendor cache hit: ${cached.length} vendors`);
     return cached;
   }
-  console.log('[zoho] cache miss — fetching vendor index');
+  console.log('[zoho] cache miss — fetching vendor index via COQL (no 2000-record cap)');
   const all: VendorStub[] = [];
-  let page = 1;
-  while (page <= 100) {
-    const batch = await Promise.all(
-      [0, 1, 2, 3, 4].map((i) => fetchOnePage(token, page + i)),
-    );
+  // COQL supports up to 10,000 records; fetch 5 batches of 200 at a time
+  const MAX_RECORDS = 10_000;
+  let offset = 0;
+  while (offset < MAX_RECORDS) {
+    // Fetch 5 pages (1000 records) in parallel
+    const batchOffsets = [0, 1, 2, 3, 4]
+      .map((i) => offset + i * 200)
+      .filter((o) => o < MAX_RECORDS);
+    const results = await Promise.all(batchOffsets.map((o) => fetchOnePageCOQL(token, o)));
     let done = false;
-    for (const page_results of batch) {
-      all.push(...page_results);
-      if (page_results.length < 200) { done = true; break; }
+    for (const { stubs, more } of results) {
+      all.push(...stubs);
+      if (!more) { done = true; break; }
     }
-    page += 5;
+    offset += batchOffsets.length * 200;
     if (done) break;
   }
   console.log(`[zoho] fetched ${all.length} vendors — caching`);
   if (all.length > 0) {
-    console.log(`[zoho] sample names: ${all.slice(0, 5).map(v => `"${v.name}"`).join(', ')}`);
+    console.log(`[zoho] sample names: ${all.slice(0, 5).map((v) => `"${v.name}"`).join(', ')}`);
   }
   await kv.set(VENDOR_CACHE_KEY, all, { ex: VENDOR_CACHE_TTL });
   return all;
