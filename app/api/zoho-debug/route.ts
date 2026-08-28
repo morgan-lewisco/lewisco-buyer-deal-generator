@@ -11,22 +11,43 @@ export async function GET(req: Request) {
     const token = await getZohoToken();
 
     if (diagOnly) {
-      // Run a COQL count to find total vendors in Zoho, and spot-check offset 2000
-      const [countRes, offset2kRes] = await Promise.all([
-        fetch('https://www.zohoapis.com/crm/v3/coql', {
-          method: 'POST',
-          headers: { Authorization: `Zoho-oauthtoken ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ select_query: 'select count(id) from Vendors' }),
-        }).then((r) => r.json()),
-        fetch('https://www.zohoapis.com/crm/v3/coql', {
-          method: 'POST',
-          headers: { Authorization: `Zoho-oauthtoken ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ select_query: 'select id, Vendor_Name from Vendors limit 5 offset 2000' }),
-        }).then((r) => r.json()),
-      ]);
+      // Search for specific vendors to see if they exist at all in Zoho
+      const searchTargets = [
+        'The Coca-Cola Company',
+        'Pearson Candy Company',
+        'Bumble Bee Foods, LLC',
+        'Kellogg Company',
+        'Tyson Foods',
+      ];
+      const results = await Promise.all(
+        searchTargets.map(async (name) => {
+          const criteria = encodeURIComponent(`(Vendor_Name:equals:${name})`);
+          const r = await fetch(
+            `https://www.zohoapis.com/crm/v3/Vendors/search?criteria=${criteria}&fields=id,Vendor_Name`,
+            { headers: { Authorization: `Zoho-oauthtoken ${token}` } },
+          ).then((res) => res.json());
+          // Also try word search
+          const word = encodeURIComponent(name.split(' ').slice(0, 2).join(' '));
+          const r2 = await fetch(
+            `https://www.zohoapis.com/crm/v3/Vendors/search?word=${word}&fields=id,Vendor_Name`,
+            { headers: { Authorization: `Zoho-oauthtoken ${token}` } },
+          ).then((res) => res.json());
+          return {
+            searched: name,
+            exactMatch: r.data?.[0] ?? null,
+            wordMatches: (r2.data ?? []).slice(0, 3).map((v: Record<string, unknown>) => v.Vendor_Name),
+          };
+        }),
+      );
+      // Also spot-check page 11 (list API) to confirm cap
+      const page11 = await fetch(
+        'https://www.zohoapis.com/crm/v3/Vendors?fields=id,Vendor_Name&per_page=200&page=11',
+        { headers: { Authorization: `Zoho-oauthtoken ${token}` } },
+      ).then((r) => r.json());
       return NextResponse.json({
-        coqlCount: countRes,
-        offset2000Sample: offset2kRes,
+        vendorSearches: results,
+        listApiPage11Count: page11.data?.length ?? 0,
+        listApiPage11Info: page11.info,
       });
     }
 
