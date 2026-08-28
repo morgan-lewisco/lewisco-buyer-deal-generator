@@ -59,35 +59,33 @@ export default function LeadList({
 
   return (
     <div className="space-y-3">
-      {/* Person filter chips + generate button */}
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white border border-slate-200 px-4 py-3 shadow-sm">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {BUYER_NAMES.map((n) => ({
-            key: n as PersonFilter,
-            label: `${n.split(' ')[0]} (${leads.filter((l) => l.assignedTo === n).length})`,
-          })).map(({ key, label }) => (
-            <button key={key} onClick={() => onPersonFilter(personFilter === key ? 'all' : key)}
-              className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                personFilter === key
-                  ? 'bg-slate-800 text-white border-slate-800'
-                  : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
-              }`}>
-              {label}
-            </button>
-          ))}
-        </div>
+      {/* Person filter chips + generate button — single row */}
+      <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-white border border-slate-200 px-3 py-2.5 shadow-sm">
+        {BUYER_NAMES.map((n) => ({
+          key: n as PersonFilter,
+          label: `${n.split(' ')[0]} (${leads.filter((l) => l.assignedTo === n).length})`,
+        })).map(({ key, label }) => (
+          <button key={key} onClick={() => onPersonFilter(personFilter === key ? 'all' : key)}
+            className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-colors ${
+              personFilter === key
+                ? 'bg-slate-800 text-white border-slate-800'
+                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+            }`}>
+            {label}
+          </button>
+        ))}
 
-        <div className="flex items-center gap-3">
+        <div className="ml-auto flex items-center gap-2 flex-shrink-0">
           {hasDismissed && (
-            <label className="flex items-center gap-1.5 cursor-pointer select-none text-sm text-slate-500">
+            <label className="flex items-center gap-1 cursor-pointer select-none text-xs text-slate-500">
               <input type="checkbox" checked={showDismissed} onChange={(e) => setShowDismissed(e.target.checked)} className="accent-red-500" />
-              Show dismissed
+              Dismissed
             </label>
           )}
           <button onClick={onGenerate} disabled={isLoading}
-            className="rounded-md bg-red-600 hover:bg-red-500 disabled:bg-red-900 disabled:cursor-wait text-white font-semibold px-4 py-2 text-sm transition shadow flex items-center gap-2 whitespace-nowrap">
+            className="rounded border border-red-600 bg-red-600 hover:bg-red-500 disabled:bg-red-900 disabled:border-red-900 disabled:cursor-wait text-white font-semibold px-2.5 py-0.5 text-xs transition flex items-center gap-1.5 whitespace-nowrap">
             {isLoading
-              ? <><span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />{genLabel}</>
+              ? <><span className="h-2.5 w-2.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />{genLabel}</>
               : genLabel}
           </button>
         </div>
