@@ -5,6 +5,24 @@ import {
 } from '@/lib/zoho-utils';
 import type { ZohoMatch } from '@/lib/types';
 
+// GET /api/zoho-link?q=Pearson — return up to 10 vendor names containing the query
+export async function GET(req: NextRequest) {
+  try {
+    const q = req.nextUrl.searchParams.get('q') ?? '';
+    if (q.length < 2) return NextResponse.json({ vendors: [] });
+    const token = await getZohoToken();
+    const stubs = await getVendorIndex(token);
+    const qLower = q.toLowerCase();
+    const vendors = stubs
+      .filter(({ name }) => name.toLowerCase().includes(qLower))
+      .slice(0, 10)
+      .map(({ name }) => name);
+    return NextResponse.json({ vendors });
+  } catch (err) {
+    return NextResponse.json({ error: String(err) }, { status: 500 });
+  }
+}
+
 // POST { company, vendorName } — manually link a lead company to a Zoho vendor
 export async function POST(req: NextRequest) {
   try {

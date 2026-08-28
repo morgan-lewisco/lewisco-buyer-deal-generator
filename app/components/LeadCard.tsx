@@ -66,21 +66,45 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
   const [linkInput, setLinkInput]         = useState('');
   const [linkLoading, setLinkLoading]     = useState(false);
   const [linkError, setLinkError]         = useState('');
+  const [suggestions, setSuggestions]     = useState<string[]>([]);
+  const suggestTimer                      = useState<ReturnType<typeof setTimeout> | null>(null);
 
-  async function handleLink(e: React.FormEvent) {
-    e.preventDefault();
-    if (!linkInput.trim()) return;
+  async function fetchSuggestions(q: string) {
+    if (q.length < 2) { setSuggestions([]); return; }
+    try {
+      const res = await fetch(`/api/zoho-link?q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      setSuggestions(data.vendors ?? []);
+    } catch { /* ignore */ }
+  }
+
+  function onLinkInputChange(val: string) {
+    setLinkInput(val);
+    setLinkError('');
+    if (suggestTimer[0]) clearTimeout(suggestTimer[0]);
+    suggestTimer[0] = setTimeout(() => fetchSuggestions(val), 250);
+  }
+
+  function pickSuggestion(name: string) {
+    setLinkInput(name);
+    setSuggestions([]);
+    submitLink(name);
+  }
+
+  async function submitLink(vendorName: string) {
+    if (!vendorName.trim()) return;
     setLinkLoading(true);
     setLinkError('');
+    setSuggestions([]);
     try {
       const res = await fetch('/api/zoho-link', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ company: lead.company, vendorName: linkInput.trim() }),
+        body: JSON.stringify({ company: lead.company, vendorName: vendorName.trim() }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setLinkError(data.error ?? 'Not found — try the exact Zoho vendor name.');
+        setLinkError(data.error ?? 'Not found — pick from the suggestions.');
       } else {
         onZohoLink?.(lead.company, data.match);
         setShowLinkForm(false);
@@ -91,6 +115,11 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
     } finally {
       setLinkLoading(false);
     }
+  }
+
+  async function handleLink(e: React.FormEvent) {
+    e.preventDefault();
+    submitLink(linkInput);
   }
 
   async function handleUnlink() {
@@ -295,20 +324,34 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
                 </div>
               ) : showLinkForm ? (
                 <form onSubmit={handleLink} className="space-y-1 text-left">
-                  <input
-                    autoFocus
-                    value={linkInput}
-                    onChange={(e) => { setLinkInput(e.target.value); setLinkError(''); }}
-                    placeholder="Zoho vendor name…"
-                    className="w-full rounded border border-indigo-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400"
-                  />
+                  <div className="relative">
+                    <input
+                      autoFocus
+                      value={linkInput}
+                      onChange={(e) => onLinkInputChange(e.target.value)}
+                      placeholder="Type to search Zoho vendors…"
+                      className="w-full rounded border border-indigo-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                    />
+                    {suggestions.length > 0 && (
+                      <ul className="absolute right-0 top-full z-20 mt-0.5 w-56 rounded border border-slate-200 bg-white shadow-lg text-[11px]">
+                        {suggestions.map((s) => (
+                          <li key={s}>
+                            <button type="button" onMouseDown={() => pickSuggestion(s)}
+                              className="w-full text-left px-2 py-1.5 hover:bg-indigo-50 hover:text-indigo-700 truncate">
+                              {s}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                   {linkError && <p className="text-red-500 text-[10px] leading-tight">{linkError}</p>}
                   <div className="flex gap-1">
                     <button type="submit" disabled={linkLoading}
                       className="rounded px-2 py-0.5 text-[10px] font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white transition">
                       {linkLoading ? '…' : 'Link'}
                     </button>
-                    <button type="button" onClick={() => { setShowLinkForm(false); setLinkError(''); setLinkInput(''); }}
+                    <button type="button" onClick={() => { setShowLinkForm(false); setLinkError(''); setLinkInput(''); setSuggestions([]); }}
                       className="rounded px-2 py-0.5 text-[10px] text-slate-500 hover:text-slate-700 transition">
                       Cancel
                     </button>
