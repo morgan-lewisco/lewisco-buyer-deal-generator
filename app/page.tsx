@@ -182,9 +182,11 @@ export default function AdminPage() {
   const isLoading            = status === 'searching' || status === 'scoring';
   const totalLeads           = leads.length;
   const assignedCount        = leads.filter((l) => l.assignedTo).length;
-  const contactedCount       = leads.filter((l) => l.status === 'contacted' && !l.dealMade).length;
-  const unassignedCount      = leads.filter((l) => !l.assignedTo && l.status !== 'contacted').length;
-  const dealCount            = leads.filter((l) => l.dealMade).length;
+  const unassignedCount        = leads.filter((l) => !l.assignedTo && l.status !== 'contacted').length;
+  const dealCount              = leads.filter((l) => l.dealMade).length;
+  const currentlyActiveCount   = leads.filter((l) =>
+    l.currentlyActive || (zohoMap[l.company]?.found && zohoMap[l.company]?.boughtManager && zohoMap[l.company]?.boughtManager !== 'None')
+  ).length;
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -238,18 +240,18 @@ export default function AdminPage() {
         {totalLeads > 0 && (
           <div className="mb-5 grid grid-cols-2 sm:grid-cols-5 gap-3">
             {([
-              { label: 'Total Leads', value: totalLeads,      num: 'text-blue-600',    ring: 'ring-blue-400',    onClick: () => { setStatusFilter('all');       setPersonFilter('all'); } },
-              { label: 'Unassigned',  value: unassignedCount, num: 'text-orange-500',  ring: 'ring-orange-400',  onClick: () => { setStatusFilter('all');       setPersonFilter('unassigned'); } },
-              { label: 'Assigned',    value: assignedCount,   num: 'text-indigo-600',  ring: 'ring-indigo-400',  onClick: () => { setStatusFilter('all');       setPersonFilter('assigned'); } },
-              { label: 'Engaged',     value: contactedCount,  num: 'text-emerald-600', ring: 'ring-emerald-400', onClick: () => { setStatusFilter('contacted'); setPersonFilter('all'); } },
-              { label: 'Deals Made', value: dealCount, num: 'text-yellow-500', ring: 'ring-yellow-400', onClick: () => { setStatusFilter('deals'); setPersonFilter('all'); } },
+              { label: 'Total Leads',      value: totalLeads,           num: 'text-blue-600',    ring: 'ring-blue-400',    onClick: () => { setStatusFilter('all');              setPersonFilter('all'); } },
+              { label: 'Unassigned',      value: unassignedCount,      num: 'text-orange-500',  ring: 'ring-orange-400',  onClick: () => { setStatusFilter('all');              setPersonFilter('unassigned'); } },
+              { label: 'Assigned',        value: assignedCount,        num: 'text-indigo-600',  ring: 'ring-indigo-400',  onClick: () => { setStatusFilter('all');              setPersonFilter('assigned'); } },
+              { label: 'Currently Active', value: currentlyActiveCount, num: 'text-blue-600',   ring: 'ring-blue-400',    onClick: () => { setStatusFilter('currently-active'); setPersonFilter('all'); } },
+              { label: 'Deals Made',      value: dealCount,            num: 'text-yellow-500',  ring: 'ring-yellow-400',  onClick: () => { setStatusFilter('deals');            setPersonFilter('all'); } },
             ] as const).map(({ label, value, num, ring, onClick }) => {
               const isActive =
-                (label === 'Total Leads'      && statusFilter === 'all'              && personFilter === 'all') ||
-                (label === 'Unassigned'       && personFilter === 'unassigned') ||
-                (label === 'Assigned'         && personFilter === 'assigned') ||
-                (label === 'Engaged'          && statusFilter === 'contacted'        && personFilter === 'all') ||
-                (label === 'Deals Made' && statusFilter === 'deals');
+                (label === 'Total Leads'       && statusFilter === 'all'              && personFilter === 'all') ||
+                (label === 'Unassigned'        && personFilter === 'unassigned') ||
+                (label === 'Assigned'          && personFilter === 'assigned') ||
+                (label === 'Currently Active'  && statusFilter === 'currently-active' && personFilter === 'all') ||
+                (label === 'Deals Made'        && statusFilter === 'deals');
               return (
                 <button key={label} onClick={onClick}
                   className={`rounded-xl bg-white border-2 px-4 py-3 shadow-sm text-center transition cursor-pointer hover:shadow-md ${
