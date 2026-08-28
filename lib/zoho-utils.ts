@@ -70,7 +70,7 @@ export function matchScore(lead: string, zohoName: string): number {
 
 // ── Vendor index (KV-cached) ──────────────────────────────────────────────────
 
-export const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v3';
+export const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v4';
 export const VENDOR_CACHE_TTL = 60 * 60 * 2; // 2 hours
 
 export type VendorStub = { id: string; name: string };
@@ -80,11 +80,18 @@ export async function fetchOnePage(token: string, page: number): Promise<VendorS
     `https://www.zohoapis.com/crm/v3/Vendors?fields=Vendor_Name&per_page=200&page=${page}`,
     { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: AbortSignal.timeout(12_000) },
   );
-  if (!res.ok) return [];
+  if (!res.ok) {
+    console.warn(`[zoho] page ${page} failed: ${res.status}`);
+    return [];
+  }
   const data = await res.json();
+  if (page === 1 && data.data?.[0]) {
+    console.log(`[zoho] page 1 sample keys: ${Object.keys(data.data[0]).join(', ')}`);
+  }
+  // Zoho may return the vendor name under Vendor_Name or Name depending on context
   return (data.data ?? []).map((v: Record<string, unknown>) => ({
     id:   String(v.id ?? ''),
-    name: String(v.Vendor_Name ?? '').trim(),
+    name: String(v.Vendor_Name ?? v['Vendor Name'] ?? v.Name ?? v.name ?? '').trim(),
   })).filter((v: VendorStub) => v.id && v.name);
 }
 

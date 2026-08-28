@@ -40,9 +40,12 @@ export async function POST(req: NextRequest) {
       if (score > best.score) best = { score, id, name: zohoName };
     }
 
+    console.log(`[zoho-link] best match for "${vendorName}": "${best.name}" (score ${best.score})`);
+
     if (best.score < 60 || !best.id) {
+      const hint = best.name ? ` Closest match in Zoho: "${best.name}"` : '';
       return NextResponse.json(
-        { error: `"${vendorName}" not found in Zoho. Try the name exactly as it appears in your CRM.` },
+        { error: `"${vendorName}" not found in Zoho (score ${best.score}).${hint}` },
         { status: 404 },
       );
     }
