@@ -70,7 +70,7 @@ export function matchScore(lead: string, zohoName: string): number {
 
 // ── Vendor index (KV-cached) ──────────────────────────────────────────────────
 
-export const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v8';
+export const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v9';
 export const VENDOR_CACHE_TTL = 60 * 60 * 2; // 2 hours
 
 export type VendorStub = { id: string; name: string };
@@ -130,51 +130,30 @@ export async function fetchOnePage(token: string, page: number): Promise<VendorS
   })).filter((v: VendorStub) => v.id && v.name);
 }
 
-// Fetch all vendors starting with a given prefix via the search API.
-// The search endpoint does NOT have the list API's 10-page/2000-record hard cap.
-async function fetchByPrefix(token: string, prefix: string): Promise<VendorStub[]> {
-  const all: VendorStub[] = [];
-  // 2 pages × 200 = 400 vendors per prefix — more than enough per letter for any realistic vendor list.
-  // Keeping this tight ensures the full 36-prefix rebuild completes well within Vercel's 60s timeout.
-  for (let page = 1; page <= 2; page++) {
-    const criteria = encodeURIComponent(`(Vendor_Name:starts_with:${prefix})`);
-    const res = await fetch(
-      `https://www.zohoapis.com/crm/v3/Vendors/search?criteria=${criteria}&fields=id,Vendor_Name&per_page=200&page=${page}`,
-      { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: AbortSignal.timeout(10_000) },
-    );
-    if (!res.ok) break;
-    const data = await res.json();
-    const records = (data.data ?? []).map((v: Record<string, unknown>) => ({
-      id:   String(v.id ?? ''),
-      name: extractVendorName(v),
-    })).filter((v: VendorStub) => v.id && v.name);
-    all.push(...records);
-    if (!data.info?.more_records) break;
-  }
-  return all;
-}
-
 export async function getVendorIndex(token: string): Promise<VendorStub[]> {
   const cached = await kv.get<VendorStub[]>(VENDOR_CACHE_KEY);
   if (cached?.length) {
     console.log(`[zoho] vendor cache hit: ${cached.length} vendors`);
     return cached;
   }
-
-  // Alphabetical prefix search — bypasses the 2000-record list-API cap.
-  // Runs 36 prefix queries (0-9 + A-Z) in parallel batches of 6.
-  console.log('[zoho] cache miss — rebuilding vendor index via alphabetical search');
-  const prefixes = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-  const prefixResults = await pMap(prefixes, (p) => fetchByPrefix(token, p), 12);
-
-  // Deduplicate by ID (a vendor starting with "Co" hits both prefix scans if names overlap)
-  const byId = new Map<string, VendorStub>();
-  for (const batch of prefixResults) {
-    for (const stub of batch) byId.set(stub.id, stub);
+  // List API — fast (~5s), reliable, but capped at 2000 records (10 pages × 200).
+  // Vendors beyond that cap are handled by searchVendorDirect() in the enrich route.
+  console.log('[zoho] cache miss — fetching vendor index via list API');
+  const all: VendorStub[] = [];
+  let page = 1;
+  while (page <= 10) {
+    const batch = await Promise.all(
+      [0, 1, 2, 3, 4].map((i) => fetchOnePage(token, page + i)),
+    );
+    let done = false;
+    for (const results of batch) {
+      all.push(...results);
+      if (results.length < 200) { done = true; break; }
+    }
+    page += 5;
+    if (done) break;
   }
-  const all = [...byId.values()];
-
-  console.log(`[zoho] fetched ${all.length} vendors across ${prefixes.length} prefix queries — caching`);
+  console.log(`[zoho] fetched ${all.length} vendors — caching`);
   if (all.length > 0) {
     console.log(`[zoho] sample names: ${all.slice(0, 5).map((v) => `"${v.name}"`).join(', ')}`);
   }
