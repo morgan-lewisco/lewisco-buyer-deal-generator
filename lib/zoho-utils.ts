@@ -70,7 +70,7 @@ export function matchScore(lead: string, zohoName: string): number {
 
 // ── Vendor index (KV-cached) ──────────────────────────────────────────────────
 
-export const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v4';
+export const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v5';
 export const VENDOR_CACHE_TTL = 60 * 60 * 2; // 2 hours
 
 export type VendorStub = { id: string; name: string };
@@ -117,6 +117,9 @@ export async function getVendorIndex(token: string): Promise<VendorStub[]> {
     if (done) break;
   }
   console.log(`[zoho] fetched ${all.length} vendors — caching`);
+  if (all.length > 0) {
+    console.log(`[zoho] sample names: ${all.slice(0, 5).map(v => `"${v.name}"`).join(', ')}`);
+  }
   await kv.set(VENDOR_CACHE_KEY, all, { ex: VENDOR_CACHE_TTL });
   return all;
 }

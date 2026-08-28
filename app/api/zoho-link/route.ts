@@ -58,12 +58,29 @@ export async function POST(req: NextRequest) {
       if (score > best.score) best = { score, id, name: zohoName };
     }
 
-    console.log(`[zoho-link] best match for "${vendorName}": "${best.name}" (score ${best.score})`);
+    console.log(`[zoho-link] local best for "${vendorName}": "${best.name}" (score ${best.score})`);
 
+    // If local cache didn't find it, try a direct Zoho search as authoritative fallback
     if (best.score < 60 || !best.id) {
-      const hint = best.name ? ` Closest match in Zoho: "${best.name}"` : '';
+      console.log(`[zoho-link] falling back to direct Zoho search for "${vendorName}"`);
+      const encoded = encodeURIComponent(`(Vendor_Name:equals:${vendorName})`);
+      const searchRes = await fetch(
+        `https://www.zohoapis.com/crm/v3/Vendors/search?criteria=${encoded}&fields=id,Vendor_Name`,
+        { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: AbortSignal.timeout(8_000) },
+      );
+      if (searchRes.ok) {
+        const searchData = await searchRes.json();
+        const hit = searchData.data?.[0];
+        if (hit?.id) {
+          await setOverride(company, String(hit.id));
+          const fields = await fetchVendorFields(token, String(hit.id));
+          const resolvedName = String(hit.Vendor_Name ?? vendorName);
+          console.log(`[zoho-link] direct search linked "${company}" → "${resolvedName}"`);
+          return NextResponse.json({ match: { found: true, ...fields, overridden: true } as ZohoMatch, resolvedName });
+        }
+      }
       return NextResponse.json(
-        { error: `"${vendorName}" not found in Zoho (score ${best.score}).${hint}` },
+        { error: `"${vendorName}" not found in Zoho. Check the spelling matches your CRM exactly.` },
         { status: 404 },
       );
     }

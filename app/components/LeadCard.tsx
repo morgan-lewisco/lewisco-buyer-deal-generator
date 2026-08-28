@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Lead, LeadStatus, ZohoMatch } from '@/lib/types';
 import { BUYER_NAMES } from '@/lib/buyers';
 
@@ -67,7 +67,7 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
   const [linkLoading, setLinkLoading]     = useState(false);
   const [linkError, setLinkError]         = useState('');
   const [suggestions, setSuggestions]     = useState<string[]>([]);
-  const suggestTimer                      = useState<ReturnType<typeof setTimeout> | null>(null);
+  const suggestTimer                      = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function fetchSuggestions(q: string) {
     if (q.length < 2) { setSuggestions([]); return; }
@@ -81,8 +81,8 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
   function onLinkInputChange(val: string) {
     setLinkInput(val);
     setLinkError('');
-    if (suggestTimer[0]) clearTimeout(suggestTimer[0]);
-    suggestTimer[0] = setTimeout(() => fetchSuggestions(val), 250);
+    if (suggestTimer.current) clearTimeout(suggestTimer.current);
+    suggestTimer.current = setTimeout(() => fetchSuggestions(val), 250);
   }
 
   function pickSuggestion(name: string) {
