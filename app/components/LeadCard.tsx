@@ -61,6 +61,8 @@ function val(s?: string): string {
 export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign, onDeal, onNotes, zohoData, onZohoLink }: Props) {
   const isContacted = lead.status === 'contacted';
   const isDismissed = lead.status === 'dismissed';
+  // "Currently Active" = company already exists in Zoho under an active buyer manager
+  const isCurrentlyActive = !!(zohoData?.found && zohoData.boughtManager && zohoData.boughtManager !== 'None');
   const [showDealForm, setShowDealForm]   = useState(false);
   const [draftNotes, setDraftNotes]       = useState(lead.dealNotes ?? '');
   const [adminNotes, setAdminNotes]       = useState(lead.adminNotes ?? '');
@@ -137,9 +139,10 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
   const cardClass = [
     'rounded-lg border p-4 transition-all',
     lead.dealMade ? 'border-yellow-400 bg-yellow-100' : '',
-    !lead.dealMade && isContacted  ? 'border-emerald-200 bg-emerald-50/40' : '',
+    !lead.dealMade && isCurrentlyActive && !isDismissed ? 'border-blue-200 bg-blue-50/30' : '',
+    !lead.dealMade && !isCurrentlyActive && isContacted  ? 'border-emerald-200 bg-emerald-50/40' : '',
     !lead.dealMade && isDismissed  ? 'border-red-200 bg-red-50/30 opacity-70' : '',
-    !lead.dealMade && !isContacted && !isDismissed ? 'border-slate-200 bg-white' : '',
+    !lead.dealMade && !isCurrentlyActive && !isContacted && !isDismissed ? 'border-slate-200 bg-white' : '',
   ].join(' ');
 
   const titleClass = [
@@ -159,7 +162,10 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
             <div className="flex items-center gap-2 flex-wrap">
               <span className={titleClass}>{lead.company}</span>
               {lead.dealMade && (
-                <span className="text-xs font-semibold text-yellow-900 bg-yellow-300 rounded-full px-2.5 py-0.5 ring-1 ring-yellow-400">✅ Past Deal Done</span>
+                <span className="text-xs font-medium text-yellow-800 bg-yellow-200 rounded-full px-2 py-0.5">🤝 Deal Made</span>
+              )}
+              {isCurrentlyActive && !lead.dealMade && (
+                <span className="text-xs font-semibold text-blue-700 bg-blue-100 rounded-full px-2 py-0.5 ring-1 ring-blue-200" title={`Active in CRM under ${zohoData?.boughtManager}`}>🔄 Currently Active</span>
               )}
               {isContacted && !lead.dealMade && (
                 <span className="text-xs font-medium text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">✓ Engaged</span>
@@ -239,7 +245,7 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
                   <button
                     onClick={() => { onDeal(lead.id, true, draftNotes); setShowDealForm(false); }}
                     className="rounded px-3 py-1 text-xs font-semibold bg-yellow-400 hover:bg-yellow-300 text-yellow-900 transition">
-                    Save Past Deal
+                    Save Deal
                   </button>
                   <button
                     onClick={() => setShowDealForm(false)}
@@ -250,7 +256,7 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
                     <button
                       onClick={() => { onDeal(lead.id, false, ''); setShowDealForm(false); }}
                       className="ml-auto rounded px-3 py-1 text-xs font-medium text-red-500 hover:text-red-700 transition">
-                      Remove Past Deal
+                      Remove Deal
                     </button>
                   )}
                 </div>
@@ -389,8 +395,8 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
                   ? 'bg-yellow-200 text-yellow-800 border-yellow-300 hover:bg-yellow-100'
                   : 'bg-white text-slate-500 border-slate-200 hover:border-yellow-400 hover:text-yellow-700'
               }`}
-              title="Mark as past deal done">
-              ✅ Past Deal
+              title="Mark as deal made">
+              🤝 Deal
             </button>
             <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Mark contacted">
               <input type="checkbox" checked={isContacted}

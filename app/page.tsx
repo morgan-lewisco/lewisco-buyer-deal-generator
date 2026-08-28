@@ -234,14 +234,14 @@ export default function AdminPage() {
               { label: 'Unassigned',  value: unassignedCount, num: 'text-orange-500',  ring: 'ring-orange-400',  onClick: () => { setStatusFilter('all');       setPersonFilter('unassigned'); } },
               { label: 'Assigned',    value: assignedCount,   num: 'text-indigo-600',  ring: 'ring-indigo-400',  onClick: () => { setStatusFilter('all');       setPersonFilter('assigned'); } },
               { label: 'Engaged',     value: contactedCount,  num: 'text-emerald-600', ring: 'ring-emerald-400', onClick: () => { setStatusFilter('contacted'); setPersonFilter('all'); } },
-              { label: 'Past Deal Done',  value: dealCount,       num: 'text-yellow-500',  ring: 'ring-yellow-400',  onClick: () => { setStatusFilter('deals');     setPersonFilter('all'); } },
+              { label: 'Deals Made',  value: dealCount,       num: 'text-yellow-500',  ring: 'ring-yellow-400',  onClick: () => { setStatusFilter('deals');     setPersonFilter('all'); } },
             ] as const).map(({ label, value, num, ring, onClick }) => {
               const isActive =
-                (label === 'Total Leads'    && statusFilter === 'all' && personFilter === 'all') ||
-                (label === 'Unassigned'     && personFilter === 'unassigned') ||
-                (label === 'Assigned'       && personFilter === 'assigned') ||
-                (label === 'Engaged'        && statusFilter === 'contacted' && personFilter === 'all') ||
-                (label === 'Past Deal Done' && statusFilter === 'deals');
+                (label === 'Total Leads' && statusFilter === 'all' && personFilter === 'all') ||
+                (label === 'Unassigned'  && personFilter === 'unassigned') ||
+                (label === 'Assigned'    && personFilter === 'assigned') ||
+                (label === 'Engaged'     && statusFilter === 'contacted' && personFilter === 'all') ||
+                (label === 'Deals Made'  && statusFilter === 'deals');
               return (
                 <button key={label} onClick={onClick}
                   className={`rounded-xl bg-white border-2 px-4 py-3 shadow-sm text-center transition cursor-pointer hover:shadow-md ${
