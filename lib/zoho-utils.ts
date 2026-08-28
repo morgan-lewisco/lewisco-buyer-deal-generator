@@ -70,14 +70,26 @@ export function matchScore(lead: string, zohoName: string): number {
 
 // ── Vendor index (KV-cached) ──────────────────────────────────────────────────
 
-export const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v5';
+export const VENDOR_CACHE_KEY = 'bdg:zoho-vendor-names-v6';
 export const VENDOR_CACHE_TTL = 60 * 60 * 2; // 2 hours
 
 export type VendorStub = { id: string; name: string };
 
+function extractVendorName(v: Record<string, unknown>): string {
+  // Try every key Zoho has ever returned for the vendor name field
+  const raw = v.Vendor_Name ?? v['Vendor Name'] ?? v.Name ?? v.name;
+  if (!raw) return '';
+  if (typeof raw === 'string') return raw.trim();
+  // Some lookup fields come back as { id, name }
+  if (typeof raw === 'object' && raw !== null && 'name' in raw)
+    return String((raw as Record<string, unknown>).name).trim();
+  return String(raw).trim();
+}
+
 export async function fetchOnePage(token: string, page: number): Promise<VendorStub[]> {
+  // Request id + Vendor_Name explicitly; id is always returned even if not listed
   const res = await fetch(
-    `https://www.zohoapis.com/crm/v3/Vendors?fields=Vendor_Name&per_page=200&page=${page}`,
+    `https://www.zohoapis.com/crm/v3/Vendors?fields=id,Vendor_Name,Name&per_page=200&page=${page}`,
     { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: AbortSignal.timeout(12_000) },
   );
   if (!res.ok) {
@@ -86,12 +98,12 @@ export async function fetchOnePage(token: string, page: number): Promise<VendorS
   }
   const data = await res.json();
   if (page === 1 && data.data?.[0]) {
-    console.log(`[zoho] page 1 sample keys: ${Object.keys(data.data[0]).join(', ')}`);
+    console.log(`[zoho] page 1 raw keys: ${Object.keys(data.data[0]).join(', ')}`);
+    console.log(`[zoho] page 1 first record: ${JSON.stringify(data.data[0])}`);
   }
-  // Zoho may return the vendor name under Vendor_Name or Name depending on context
   return (data.data ?? []).map((v: Record<string, unknown>) => ({
     id:   String(v.id ?? ''),
-    name: String(v.Vendor_Name ?? v['Vendor Name'] ?? v.Name ?? v.name ?? '').trim(),
+    name: extractVendorName(v),
   })).filter((v: VendorStub) => v.id && v.name);
 }
 
@@ -159,6 +171,49 @@ export async function pMap<T, R>(items: T[], fn: (x: T) => Promise<R>, limit: nu
   const worker = async () => { while (idx < items.length) { const i = idx++; results[i] = await fn(items[i]); } };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
   return results;
+}
+
+// ── Direct Zoho search (bypasses local index) ─────────────────────────────────
+
+export async function searchVendorDirect(
+  token: string,
+  company: string,
+): Promise<VendorStub | null> {
+  // 1. Exact Vendor_Name match via criteria search
+  try {
+    const criteria = encodeURIComponent(`(Vendor_Name:equals:${company})`);
+    const res = await fetch(
+      `https://www.zohoapis.com/crm/v3/Vendors/search?criteria=${criteria}&fields=id,Vendor_Name,Name`,
+      { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: AbortSignal.timeout(6_000) },
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const r: Record<string, unknown> = data.data?.[0];
+      if (r?.id) return { id: String(r.id), name: extractVendorName(r) || company };
+    }
+  } catch { /* timeout or network — continue */ }
+
+  // 2. Word search fallback (partial name match)
+  try {
+    const word = encodeURIComponent(company);
+    const res = await fetch(
+      `https://www.zohoapis.com/crm/v3/Vendors/search?word=${word}&fields=id,Vendor_Name,Name`,
+      { headers: { Authorization: `Zoho-oauthtoken ${token}` }, signal: AbortSignal.timeout(6_000) },
+    );
+    if (res.ok) {
+      const data = await res.json();
+      // Pick the first result that fuzzy-scores ≥60 to avoid false positives
+      for (const raw of (data.data ?? []) as Record<string, unknown>[]) {
+        if (!raw?.id) continue;
+        const zohoName = extractVendorName(raw);
+        if (matchScore(company, zohoName) >= 60) {
+          return { id: String(raw.id), name: zohoName || company };
+        }
+      }
+    }
+  } catch { /* timeout or network */ }
+
+  return null;
 }
 
 // ── Manual overrides (company → vendor ID) ────────────────────────────────────

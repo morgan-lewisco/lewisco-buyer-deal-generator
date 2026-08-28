@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-  getZohoToken, getVendorIndex, matchScore, fetchVendorFields, pMap, getOverrides,
+  getZohoToken, getVendorIndex, matchScore, fetchVendorFields, pMap, getOverrides, searchVendorDirect,
 } from '@/lib/zoho-utils';
 import type { ZohoMatch } from '@/lib/types';
 
@@ -42,6 +42,26 @@ export async function POST(req: NextRequest) {
         console.log(`[zoho-enrich] MATCH  "${company}" → "${best.name}" (score ${best.score})`);
       } else {
         console.log(`[zoho-enrich] MISS   "${company}" — best score ${best.score} vs "${best.name}"`);
+      }
+    }
+
+    // Direct Zoho search fallback for companies that didn't fuzzy-match the local index
+    const unmatched = companies.filter((c) => !matchedIds.has(c));
+    if (unmatched.length > 0) {
+      console.log(`[zoho-enrich] ${unmatched.length} unmatched → falling back to direct Zoho search`);
+      const directHits = await pMap(
+        unmatched,
+        async (company) => {
+          const stub = await searchVendorDirect(token, company);
+          return { company, stub };
+        },
+        5,
+      );
+      for (const { company, stub } of directHits) {
+        if (stub?.id) {
+          matchedIds.set(company, { id: stub.id, overridden: false });
+          console.log(`[zoho-enrich] DIRECT "${company}" → "${stub.name}" (${stub.id})`);
+        }
       }
     }
 
