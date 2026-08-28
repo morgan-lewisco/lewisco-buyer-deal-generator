@@ -30,6 +30,16 @@ export default function AdminPage() {
   // Save debounce — avoid hammering KV on rapid status/assignment changes
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const handleZohoLink = useCallback((company: string, match: ZohoMatch | null) => {
+    setZohoMap((prev) => {
+      if (match === null) {
+        // Unlinked — revert to not-found state
+        return { ...prev, [company]: { found: false, boughtManager: '', vendorOriginatorByName: '' } };
+      }
+      return { ...prev, [company]: match };
+    });
+  }, []);
+
   const enrichZoho = useCallback((pool: Lead[]) => {
     if (!pool.length) return;
     const companies = [...new Set(pool.map((l) => l.company))];
@@ -297,6 +307,7 @@ export default function AdminPage() {
             isLoading={isLoading}
             genLabel={STATUS_LABEL[status]}
             zohoMap={zohoMap}
+            onZohoLink={handleZohoLink}
           />
         )}
       </main>

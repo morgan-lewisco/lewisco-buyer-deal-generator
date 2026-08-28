@@ -12,6 +12,7 @@ interface Props {
   onAssign: (id: string, name: string) => void;
   onDeal: (id: string, dealMade: boolean, dealNotes: string) => void;
   zohoData?: ZohoMatch;
+  onZohoLink?: (company: string, match: ZohoMatch | null) => void;
 }
 
 const SIGNAL_CONFIG: Record<string, { label: string; className: string }> = {
@@ -56,11 +57,50 @@ function val(s?: string): string {
 }
 
 
-export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign, onDeal, zohoData }: Props) {
+export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign, onDeal, zohoData, onZohoLink }: Props) {
   const isContacted = lead.status === 'contacted';
   const isDismissed = lead.status === 'dismissed';
-  const [showDealForm, setShowDealForm] = useState(false);
-  const [draftNotes, setDraftNotes]     = useState(lead.dealNotes ?? '');
+  const [showDealForm, setShowDealForm]   = useState(false);
+  const [draftNotes, setDraftNotes]       = useState(lead.dealNotes ?? '');
+  const [showLinkForm, setShowLinkForm]   = useState(false);
+  const [linkInput, setLinkInput]         = useState('');
+  const [linkLoading, setLinkLoading]     = useState(false);
+  const [linkError, setLinkError]         = useState('');
+
+  async function handleLink(e: React.FormEvent) {
+    e.preventDefault();
+    if (!linkInput.trim()) return;
+    setLinkLoading(true);
+    setLinkError('');
+    try {
+      const res = await fetch('/api/zoho-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ company: lead.company, vendorName: linkInput.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setLinkError(data.error ?? 'Not found — try the exact Zoho vendor name.');
+      } else {
+        onZohoLink?.(lead.company, data.match);
+        setShowLinkForm(false);
+        setLinkInput('');
+      }
+    } catch {
+      setLinkError('Request failed — check your connection.');
+    } finally {
+      setLinkLoading(false);
+    }
+  }
+
+  async function handleUnlink() {
+    await fetch('/api/zoho-link', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company: lead.company }),
+    });
+    onZohoLink?.(lead.company, null);
+  }
 
   const cardClass = [
     'rounded-lg border p-4 transition-all',
@@ -234,11 +274,16 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
         <div className="flex flex-shrink-0 flex-col items-end gap-2">
           {/* Zoho CRM info */}
           {zohoData !== undefined && (
-            <div className="text-right text-xs leading-snug">
-              {!zohoData.found ? (
-                <span className="text-slate-400 italic">Vendor not in Zoho</span>
-              ) : (
+            <div className="text-right text-xs leading-snug max-w-[200px]">
+              {zohoData.found ? (
                 <div className="space-y-0.5">
+                  {zohoData.overridden && (
+                    <div className="flex items-center justify-end gap-1 mb-0.5">
+                      <span className="text-indigo-500 italic text-[10px]">linked override</span>
+                      <button onClick={handleUnlink} title="Remove override"
+                        className="text-[10px] text-slate-400 hover:text-red-500 transition">✕</button>
+                    </div>
+                  )}
                   <div className="text-slate-500">
                     <span className="font-medium text-slate-600">Bought Manager:</span>{' '}
                     <span className={zohoData.boughtManager === 'None' ? 'text-slate-400 italic' : 'text-slate-700'}>{zohoData.boughtManager}</span>
@@ -247,6 +292,35 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
                     <span className="font-medium text-slate-600">Originated By:</span>{' '}
                     <span className={zohoData.vendorOriginatorByName === 'None' ? 'text-slate-400 italic' : 'text-slate-700'}>{zohoData.vendorOriginatorByName}</span>
                   </div>
+                </div>
+              ) : showLinkForm ? (
+                <form onSubmit={handleLink} className="space-y-1 text-left">
+                  <input
+                    autoFocus
+                    value={linkInput}
+                    onChange={(e) => { setLinkInput(e.target.value); setLinkError(''); }}
+                    placeholder="Zoho vendor name…"
+                    className="w-full rounded border border-indigo-300 px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                  />
+                  {linkError && <p className="text-red-500 text-[10px] leading-tight">{linkError}</p>}
+                  <div className="flex gap-1">
+                    <button type="submit" disabled={linkLoading}
+                      className="rounded px-2 py-0.5 text-[10px] font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white transition">
+                      {linkLoading ? '…' : 'Link'}
+                    </button>
+                    <button type="button" onClick={() => { setShowLinkForm(false); setLinkError(''); setLinkInput(''); }}
+                      className="rounded px-2 py-0.5 text-[10px] text-slate-500 hover:text-slate-700 transition">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="flex items-center justify-end gap-1.5">
+                  <span className="text-slate-400 italic">Vendor not in Zoho</span>
+                  <button onClick={() => setShowLinkForm(true)}
+                    className="text-[10px] font-semibold text-indigo-500 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-400 rounded px-1.5 py-0.5 transition whitespace-nowrap">
+                    Link
+                  </button>
                 </div>
               )}
             </div>

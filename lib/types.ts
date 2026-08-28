@@ -77,6 +77,7 @@ export interface ZohoMatch {
   found: boolean;
   boughtManager: string;
   vendorOriginatorByName: string;
+  overridden?: boolean; // true when match came from a manual human override
 }
 
 export interface PoolState {

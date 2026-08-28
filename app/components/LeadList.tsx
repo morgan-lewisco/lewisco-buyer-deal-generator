@@ -19,11 +19,12 @@ interface Props {
   isLoading: boolean;
   genLabel: string;
   zohoMap: Record<string, ZohoMatch>;
+  onZohoLink: (company: string, match: ZohoMatch | null) => void;
 }
 
 export default function LeadList({
   leads, statusFilter, personFilter, onPersonFilter,
-  onUpdateStatus, onAssign, onDeal, onGenerate, isLoading, genLabel, zohoMap,
+  onUpdateStatus, onAssign, onDeal, onGenerate, isLoading, genLabel, zohoMap, onZohoLink,
 }: Props) {
   const [showDismissed, setShowDismissed] = useState(true);
 
@@ -101,7 +102,7 @@ export default function LeadList({
             <LeadCard key={lead.id} lead={lead} rank={i + 1}
               onContact={handleContact} onDismiss={handleDismiss}
               onUndoDismiss={handleUndoDismiss} onAssign={onAssign} onDeal={onDeal}
-              zohoData={zohoMap[lead.company]} />
+              zohoData={zohoMap[lead.company]} onZohoLink={onZohoLink} />
           ))}
         </div>
       )}
