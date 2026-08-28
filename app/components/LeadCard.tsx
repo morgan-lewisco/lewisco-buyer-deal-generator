@@ -159,7 +159,7 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
             <div className="flex items-center gap-2 flex-wrap">
               <span className={titleClass}>{lead.company}</span>
               {lead.dealMade && (
-                <span className="text-xs font-medium text-yellow-800 bg-yellow-200 rounded-full px-2 py-0.5">🤝 Deal Made</span>
+                <span className="text-xs font-semibold text-yellow-900 bg-yellow-300 rounded-full px-2.5 py-0.5 ring-1 ring-yellow-400">✅ Past Deal Done</span>
               )}
               {isContacted && !lead.dealMade && (
                 <span className="text-xs font-medium text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">✓ Engaged</span>
@@ -239,7 +239,7 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
                   <button
                     onClick={() => { onDeal(lead.id, true, draftNotes); setShowDealForm(false); }}
                     className="rounded px-3 py-1 text-xs font-semibold bg-yellow-400 hover:bg-yellow-300 text-yellow-900 transition">
-                    Save Deal
+                    Save Past Deal
                   </button>
                   <button
                     onClick={() => setShowDealForm(false)}
@@ -250,7 +250,7 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
                     <button
                       onClick={() => { onDeal(lead.id, false, ''); setShowDealForm(false); }}
                       className="ml-auto rounded px-3 py-1 text-xs font-medium text-red-500 hover:text-red-700 transition">
-                      Remove Deal
+                      Remove Past Deal
                     </button>
                   )}
                 </div>
@@ -389,8 +389,8 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
                   ? 'bg-yellow-200 text-yellow-800 border-yellow-300 hover:bg-yellow-100'
                   : 'bg-white text-slate-500 border-slate-200 hover:border-yellow-400 hover:text-yellow-700'
               }`}
-              title="Mark as deal made">
-              🤝 Deal
+              title="Mark as past deal done">
+              ✅ Past Deal
             </button>
             <label className="flex items-center gap-1.5 cursor-pointer select-none" title="Mark contacted">
               <input type="checkbox" checked={isContacted}
