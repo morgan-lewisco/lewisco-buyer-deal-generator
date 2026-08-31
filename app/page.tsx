@@ -16,13 +16,15 @@ const STATUS_LABEL: Record<GenStatus, string> = {
 };
 
 export default function AdminPage() {
-  const [leads, setLeads]             = useState<Lead[]>([]);
-  const [generatedAt, setGeneratedAt] = useState<string | null>(null);
-  const [status, setStatus]           = useState<GenStatus>('idle');
-  const [errorMsg, setErrorMsg]       = useState('');
-  const [meta, setMeta]               = useState<{ searches: number; signals: number; deduped: boolean } | null>(null);
-  const [poolLoading, setPoolLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [leads, setLeads]               = useState<Lead[]>([]);
+  const [deletedLeads, setDeletedLeads] = useState<Lead[]>([]);
+  const [generatedAt, setGeneratedAt]   = useState<string | null>(null);
+  const [status, setStatus]             = useState<GenStatus>('idle');
+  const [errorMsg, setErrorMsg]         = useState('');
+  const [meta, setMeta]                 = useState<{ searches: number; signals: number; deduped: boolean } | null>(null);
+  const [poolLoading, setPoolLoading]   = useState(true);
+  const [showAddModal, setShowAddModal]         = useState(false);
+  const [showDeletedPanel, setShowDeletedPanel] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'contacted' | 'deals' | 'currently-active'>('all');
   const [personFilter, setPersonFilter] = useState<'all' | 'unassigned' | 'assigned' | string>('all');
   const [zohoMap, setZohoMap]           = useState<Record<string, ZohoMatch>>({});
@@ -64,19 +66,20 @@ export default function AdminPage() {
           setStatus('done');
           enrichZoho(state.leads);
         }
+        if (state.deletedLeads?.length) setDeletedLeads(state.deletedLeads);
       })
       .catch(console.error)
       .finally(() => setPoolLoading(false));
   }, [enrichZoho]);
 
   // Persist pool to server whenever leads change (debounced 800ms)
-  const persistPool = useCallback((nextLeads: Lead[], nextGeneratedAt: string | null) => {
+  const persistPool = useCallback((nextLeads: Lead[], nextGeneratedAt: string | null, nextDeleted?: Lead[]) => {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       fetch('/api/pool', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leads: nextLeads, generatedAt: nextGeneratedAt }),
+        body: JSON.stringify({ leads: nextLeads, generatedAt: nextGeneratedAt, deletedLeads: nextDeleted }),
       }).catch(console.error);
     }, 800);
   }, []);
@@ -125,6 +128,36 @@ export default function AdminPage() {
     });
   }, [generatedAt, persistPool]);
 
+  const handleDelete = useCallback((id: string) => {
+    setLeads((prev) => {
+      const lead = prev.find((l) => l.id === id);
+      const next = prev.filter((l) => l.id !== id);
+      if (lead) {
+        setDeletedLeads((prevDeleted) => {
+          const nextDeleted = [lead, ...prevDeleted];
+          persistPool(next, generatedAt, nextDeleted);
+          return nextDeleted;
+        });
+      }
+      return next;
+    });
+  }, [generatedAt, persistPool]);
+
+  const handleRestore = useCallback((id: string) => {
+    setDeletedLeads((prev) => {
+      const lead = prev.find((l) => l.id === id);
+      const next = prev.filter((l) => l.id !== id);
+      if (lead) {
+        setLeads((prevLeads) => {
+          const nextLeads = [lead, ...prevLeads].sort((a, b) => b.blendedScore - a.blendedScore);
+          persistPool(nextLeads, generatedAt, next);
+          return nextLeads;
+        });
+      }
+      return next;
+    });
+  }, [generatedAt, persistPool]);
+
   const handleCurrentlyActive = useCallback((id: string, active: boolean) => {
     setLeads((prev) => {
       const next = updateLeadCurrentlyActive(prev, id, active);
@@ -169,6 +202,7 @@ export default function AdminPage() {
     if (!confirm('Clear all leads and start fresh? This cannot be undone.')) return;
     await fetch('/api/pool', { method: 'DELETE' });
     setLeads([]);
+    setDeletedLeads([]);
     setGeneratedAt(null);
     setMeta(null);
     setStatus('idle');
@@ -217,6 +251,12 @@ export default function AdminPage() {
               className="text-xs text-slate-300 hover:text-white border border-slate-500 hover:border-slate-300 rounded px-2.5 py-1 transition">
               + Add Lead
             </button>
+            {deletedLeads.length > 0 && (
+              <button onClick={() => setShowDeletedPanel(true)}
+                className="text-xs text-slate-400 hover:text-white border border-slate-600 hover:border-slate-400 rounded px-2.5 py-1 transition">
+                Deleted ({deletedLeads.length})
+              </button>
+            )}
             {leads.length > 0 && (
               <button onClick={handleClearPool}
                 className="text-xs text-slate-400 hover:text-red-400 border border-slate-600 hover:border-red-500 rounded px-2.5 py-1 transition">
@@ -323,6 +363,7 @@ export default function AdminPage() {
             onDeal={handleDeal}
             onNotes={handleNotes}
             onCurrentlyActive={handleCurrentlyActive}
+            onDelete={handleDelete}
             onGenerate={handleGenerate}
             isLoading={isLoading}
             genLabel={STATUS_LABEL[status]}
@@ -333,6 +374,35 @@ export default function AdminPage() {
       </main>
       {showAddModal && (
         <AddLeadModal onAdd={handleAddLead} onClose={() => setShowAddModal(false)} />
+      )}
+
+      {/* Deleted leads panel */}
+      {showDeletedPanel && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-16 px-4" onClick={() => setShowDeletedPanel(false)}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[70vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200">
+              <h2 className="text-sm font-semibold text-slate-800">Deleted Leads ({deletedLeads.length})</h2>
+              <button onClick={() => setShowDeletedPanel(false)} className="text-slate-400 hover:text-slate-700 text-lg leading-none">✕</button>
+            </div>
+            <div className="overflow-y-auto flex-1 divide-y divide-slate-100">
+              {deletedLeads.length === 0 ? (
+                <p className="py-10 text-center text-sm text-slate-400">No deleted leads.</p>
+              ) : deletedLeads.map((lead) => (
+                <div key={lead.id} className="flex items-center justify-between px-5 py-3 gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-800 truncate">{lead.company}</p>
+                    <p className="text-xs text-slate-400">{lead.category}</p>
+                  </div>
+                  <button
+                    onClick={() => handleRestore(lead.id)}
+                    className="flex-shrink-0 rounded px-3 py-1 text-xs font-semibold text-indigo-600 border border-indigo-200 hover:bg-indigo-50 transition">
+                    Restore
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

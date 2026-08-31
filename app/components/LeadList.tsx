@@ -1,5 +1,4 @@
 'use client';
-import { useState } from 'react';
 import { Lead, LeadStatus, ZohoMatch } from '@/lib/types';
 import { BUYER_NAMES } from '@/lib/buyers';
 import LeadCard from './LeadCard';
@@ -17,6 +16,7 @@ interface Props {
   onDeal: (id: string, dealMade: boolean, dealNotes: string) => void;
   onNotes: (id: string, notes: string) => void;
   onCurrentlyActive: (id: string, active: boolean) => void;
+  onDelete: (id: string) => void;
   onGenerate: () => void;
   isLoading: boolean;
   genLabel: string;
@@ -26,9 +26,8 @@ interface Props {
 
 export default function LeadList({
   leads, statusFilter, personFilter, onPersonFilter,
-  onUpdateStatus, onAssign, onDeal, onNotes, onCurrentlyActive, onGenerate, isLoading, genLabel, zohoMap, onZohoLink,
+  onUpdateStatus, onAssign, onDeal, onNotes, onCurrentlyActive, onDelete, onGenerate, isLoading, genLabel, zohoMap, onZohoLink,
 }: Props) {
-  const [showDismissed, setShowDismissed] = useState(true);
 
   function byPerson(pool: Lead[]): Lead[] {
     if (personFilter === 'all') return pool;
@@ -42,31 +41,29 @@ export default function LeadList({
   }
 
   function byStatus(pool: Lead[]): Lead[] {
-    if (statusFilter === 'all') return pool;
-    if (statusFilter === 'active') return pool.filter((l) => l.status !== 'contacted' && !l.dealMade);
-    if (statusFilter === 'contacted') return pool.filter((l) => l.status === 'contacted' && !l.dealMade);
-    if (statusFilter === 'deals') return pool.filter((l) => !!l.dealMade);
-    if (statusFilter === 'currently-active') return pool.filter(isLeadCurrentlyActive);
-    return pool;
+    // Always exclude old dismissed leads from the active pool view
+    const active = pool.filter((l) => l.status !== 'dismissed');
+    if (statusFilter === 'all') return active;
+    if (statusFilter === 'active') return active.filter((l) => l.status !== 'contacted' && !l.dealMade);
+    if (statusFilter === 'contacted') return active.filter((l) => l.status === 'contacted' && !l.dealMade);
+    if (statusFilter === 'deals') return active.filter((l) => !!l.dealMade);
+    if (statusFilter === 'currently-active') return active.filter(isLeadCurrentlyActive);
+    return active;
   }
 
-  const personPool  = byPerson(leads);
-  const visible     = byStatus(personPool).filter((l) => showDismissed || l.status !== 'dismissed');
-  const hasDismissed = byStatus(personPool).some((l) => l.status === 'dismissed');
-
-  const handleContact     = (id: string) => {
+  const handleContact = (id: string) => {
     const lead = leads.find((l) => l.id === id);
     if (!lead) return;
     onUpdateStatus(id, lead.status === 'contacted' ? 'new' : 'contacted');
   };
-  const handleDismiss     = (id: string) => onUpdateStatus(id, 'dismissed');
-  const handleUndoDismiss = (id: string) => onUpdateStatus(id, 'new');
+
+  const visible = byStatus(byPerson(leads));
 
   if (leads.length === 0) return null;
 
   return (
     <div className="space-y-3">
-      {/* Person filter chips + generate button — single row */}
+      {/* Person filter chips + generate button */}
       <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-white border border-slate-200 px-3 py-2.5 shadow-sm">
         {BUYER_NAMES.map((n) => ({
           key: n as PersonFilter,
@@ -83,12 +80,6 @@ export default function LeadList({
         ))}
 
         <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-          {hasDismissed && (
-            <label className="flex items-center gap-1 cursor-pointer select-none text-xs text-slate-500">
-              <input type="checkbox" checked={showDismissed} onChange={(e) => setShowDismissed(e.target.checked)} className="accent-red-500" />
-              Dismissed
-            </label>
-          )}
           <button onClick={onGenerate} disabled={isLoading}
             className="rounded border border-red-600 bg-red-600 hover:bg-red-500 disabled:bg-red-900 disabled:border-red-900 disabled:cursor-wait text-white font-semibold px-2.5 py-0.5 text-xs transition flex items-center gap-1.5 whitespace-nowrap">
             {isLoading
@@ -105,8 +96,8 @@ export default function LeadList({
         <div className="space-y-3">
           {visible.map((lead, i) => (
             <LeadCard key={lead.id} lead={lead} rank={i + 1}
-              onContact={handleContact} onDismiss={handleDismiss}
-              onUndoDismiss={handleUndoDismiss} onAssign={onAssign} onDeal={onDeal}
+              onContact={handleContact} onDelete={onDelete}
+              onAssign={onAssign} onDeal={onDeal}
               onNotes={onNotes} onCurrentlyActive={onCurrentlyActive}
               zohoData={zohoMap[lead.company]} onZohoLink={onZohoLink} />
           ))}

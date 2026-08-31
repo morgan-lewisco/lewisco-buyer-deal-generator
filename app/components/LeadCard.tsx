@@ -7,8 +7,7 @@ interface Props {
   lead: Lead;
   rank: number;
   onContact: (id: string) => void;
-  onDismiss: (id: string) => void;
-  onUndoDismiss: (id: string) => void;
+  onDelete: (id: string) => void;
   onAssign: (id: string, name: string) => void;
   onDeal: (id: string, dealMade: boolean, dealNotes: string) => void;
   onNotes: (id: string, notes: string) => void;
@@ -59,9 +58,8 @@ function val(s?: string): string {
 }
 
 
-export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismiss, onAssign, onDeal, onNotes, onCurrentlyActive, zohoData, onZohoLink }: Props) {
+export default function LeadCard({ lead, rank, onContact, onDelete, onAssign, onDeal, onNotes, onCurrentlyActive, zohoData, onZohoLink }: Props) {
   const isContacted = lead.status === 'contacted';
-  const isDismissed = lead.status === 'dismissed';
   // "Currently Active" = existing CRM account (manual flag OR auto-detected from Zoho)
   const isCurrentlyActive = !!(lead.currentlyActive || (zohoData?.found && zohoData.boughtManager && zohoData.boughtManager !== 'None'));
   const [showDealForm, setShowDealForm]   = useState(false);
@@ -140,17 +138,14 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
   const cardClass = [
     'rounded-lg border p-4 transition-all',
     lead.dealMade ? 'border-yellow-400 bg-yellow-100' : '',
-    !lead.dealMade && isCurrentlyActive && !isDismissed ? 'border-blue-200 bg-blue-50/30' : '',
-    !lead.dealMade && !isCurrentlyActive && isContacted  ? 'border-emerald-200 bg-emerald-50/40' : '',
-    !lead.dealMade && isDismissed  ? 'border-red-200 bg-red-50/30 opacity-70' : '',
-    !lead.dealMade && !isCurrentlyActive && !isContacted && !isDismissed ? 'border-slate-200 bg-white' : '',
+    !lead.dealMade && isCurrentlyActive ? 'border-blue-200 bg-blue-50/30' : '',
+    !lead.dealMade && !isCurrentlyActive && isContacted ? 'border-emerald-200 bg-emerald-50/40' : '',
+    !lead.dealMade && !isCurrentlyActive && !isContacted ? 'border-slate-200 bg-white' : '',
   ].join(' ');
 
   const titleClass = [
     'font-semibold text-base',
-    isContacted  ? 'text-emerald-800' : '',
-    isDismissed  ? 'line-through text-red-700' : '',
-    !isContacted && !isDismissed ? 'text-slate-900' : '',
+    isContacted ? 'text-emerald-800' : 'text-slate-900',
   ].join(' ');
 
   return (
@@ -170,9 +165,6 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
               )}
               {isContacted && !lead.dealMade && (
                 <span className="text-xs font-medium text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">✓ Engaged</span>
-              )}
-              {isDismissed && (
-                <span className="text-xs font-medium text-red-700 bg-red-100 rounded-full px-2 py-0.5">Dismissed</span>
               )}
             </div>
 
@@ -416,18 +408,11 @@ export default function LeadCard({ lead, rank, onContact, onDismiss, onUndoDismi
               <span className="text-xs text-slate-500 hidden sm:inline">Engaged</span>
             </label>
 
-            {isDismissed ? (
-              <button onClick={() => onUndoDismiss(lead.id)}
-                className="rounded px-2 py-1 text-xs font-medium text-red-600 border border-red-300 hover:bg-red-50 transition">
-                Undo
-              </button>
-            ) : (
-              <button onClick={() => onDismiss(lead.id)}
-                className="rounded px-2 py-1 text-xs font-medium text-slate-400 border border-slate-200 hover:border-red-300 hover:text-red-500 transition"
-                title="Dismiss">
-                ✕
-              </button>
-            )}
+            <button onClick={() => onDelete(lead.id)}
+              className="rounded px-2 py-1 text-xs font-medium text-slate-400 border border-slate-200 hover:border-red-300 hover:text-red-500 transition"
+              title="Delete lead">
+              ✕
+            </button>
 
             <a
               href="https://crm.zoho.com/crm/org695870911/tab/Vendors"

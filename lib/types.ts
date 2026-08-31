@@ -85,6 +85,7 @@ export interface ZohoMatch {
 export interface PoolState {
   leads: Lead[];
   generatedAt: string | null;
+  deletedLeads?: Lead[];
 }
 
 export interface GenerateResult {
