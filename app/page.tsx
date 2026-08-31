@@ -251,12 +251,6 @@ export default function AdminPage() {
               className="text-xs text-slate-300 hover:text-white border border-slate-500 hover:border-slate-300 rounded px-2.5 py-1 transition">
               + Add Lead
             </button>
-            {deletedLeads.length > 0 && (
-              <button onClick={() => setShowDeletedPanel(true)}
-                className="text-xs text-slate-400 hover:text-white border border-slate-600 hover:border-slate-400 rounded px-2.5 py-1 transition">
-                Deleted ({deletedLeads.length})
-              </button>
-            )}
             {leads.length > 0 && (
               <button onClick={handleClearPool}
                 className="text-xs text-slate-400 hover:text-red-400 border border-slate-600 hover:border-red-500 rounded px-2.5 py-1 transition">
@@ -305,6 +299,16 @@ export default function AdminPage() {
           </div>
         )}
 
+
+        {/* Deleted leads link */}
+        {deletedLeads.length > 0 && (
+          <div className="mb-3 flex justify-end">
+            <button onClick={() => setShowDeletedPanel(true)}
+              className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2 transition">
+              {deletedLeads.length} deleted lead{deletedLeads.length !== 1 ? 's' : ''}
+            </button>
+          </div>
+        )}
 
         {/* Meta info */}
         {meta && (
