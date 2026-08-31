@@ -60,13 +60,29 @@ export default function AdminPage() {
     fetch('/api/pool')
       .then((r) => r.json())
       .then((state) => {
-        if (state.leads?.length) {
-          setLeads(state.leads);
+        const allLeads: Lead[] = state.leads ?? [];
+        // Migrate any previously-dismissed leads into the deleted bucket
+        const activeLeads   = allLeads.filter((l) => l.status !== 'dismissed');
+        const migratedOut   = allLeads.filter((l) => l.status === 'dismissed');
+        const existingDeleted: Lead[] = state.deletedLeads ?? [];
+        const mergedDeleted = [...existingDeleted, ...migratedOut];
+
+        if (activeLeads.length) {
+          setLeads(activeLeads);
           setGeneratedAt(state.generatedAt ?? null);
           setStatus('done');
-          enrichZoho(state.leads);
+          enrichZoho(activeLeads);
         }
-        if (state.deletedLeads?.length) setDeletedLeads(state.deletedLeads);
+        setDeletedLeads(mergedDeleted);
+
+        // Persist the migration so dismissed leads don't re-appear on next load
+        if (migratedOut.length) {
+          fetch('/api/pool', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ leads: activeLeads, generatedAt: state.generatedAt ?? null, deletedLeads: mergedDeleted }),
+          }).catch(console.error);
+        }
       })
       .catch(console.error)
       .finally(() => setPoolLoading(false));
@@ -300,12 +316,12 @@ export default function AdminPage() {
         )}
 
 
-        {/* Deleted leads link */}
-        {deletedLeads.length > 0 && (
+        {/* Deleted leads link — always visible once pool is loaded */}
+        {!poolLoading && (
           <div className="mb-3 flex justify-end">
             <button onClick={() => setShowDeletedPanel(true)}
               className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2 transition">
-              {deletedLeads.length} deleted lead{deletedLeads.length !== 1 ? 's' : ''}
+              {deletedLeads.length > 0 ? `${deletedLeads.length} deleted lead${deletedLeads.length !== 1 ? 's' : ''}` : 'Deleted leads'}
             </button>
           </div>
         )}
