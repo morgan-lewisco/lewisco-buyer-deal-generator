@@ -110,7 +110,7 @@ export default function AdminPage() {
       const res = await fetch('/api/generate-leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ options: { excludeContacted: false, excludeDismissed: false, windowDays: 90 } }),
+        body: JSON.stringify({ options: { excludeContacted: false, excludeDismissed: false, windowDays: 7 } }),
       });
 
       if (!res.ok) {

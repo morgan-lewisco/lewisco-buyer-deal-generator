@@ -2,7 +2,12 @@ import { Lead, LeadStatus, PoolState } from './types';
 
 const POOL_KEY = 'bdg-live:pool';
 
-const norm = (s: string) => s.toLowerCase().trim();
+const norm = (s: string) => s
+  .toLowerCase()
+  .trim()
+  .replace(/\b(inc|llc|ltd|co|corp|company|foods|food|brands|brand|group|holdings|international|industries|enterprises|baking|bakery|snacks|snack|beverage|beverages|products|trading|distributors|distributing|distribution)\.?\b/g, '')
+  .replace(/[^a-z0-9]/g, '')
+  .trim();
 
 /**
  * Remove parent-company duplicates from a lead list.
@@ -77,7 +82,7 @@ export function clearPoolState(): void {
  * - Result sorted best-score-first.
  */
 export function accumulateLeads(existing: Lead[], fresh: Lead[]): Lead[] {
-  const key = (l: Lead) => norm(l.zoomInfoId ?? l.company).replace(/[^a-z0-9]/g, '');
+  const key = (l: Lead) => norm(l.zoomInfoId ?? l.company);
 
   const freshByKey = new Map<string, Lead>();
   for (const l of fresh) freshByKey.set(key(l), l);
