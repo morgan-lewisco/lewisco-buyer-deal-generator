@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { options } = body as { options: GenerateOptions };
 
-    const result = await generateLeads(GLOBAL_PROFILE, options ?? { excludeContacted: false, excludeDismissed: false, windowDays: 7 });
+    const result = await generateLeads(GLOBAL_PROFILE, options ?? { excludeContacted: false, excludeDismissed: false, windowDays: 4 });
     return NextResponse.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';

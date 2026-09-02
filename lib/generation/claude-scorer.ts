@@ -82,7 +82,7 @@ EXTRACTION RULES
 - PARENT COMPANY: if the brand is a subsidiary, set parentCompany to the parent/holding company name (e.g. Frito-Lay → PepsiCo, Oscar Mayer → Kraft Heinz, Gatorade → PepsiCo, Tropicana → PAI Partners, Kool-Aid → Kraft Heinz). Use your knowledge of CPG corporate structure — this does not need to be in the headline.
 - COMPANY NAME: always use the real legal or brand name (e.g. "Our Home", "Utz Quality Foods"). Never use generic descriptions like "Snack Company" or "Unnamed beverage brand" — if you cannot identify the real name, skip the lead entirely
 - signalDate: use the article/press release date; if unknown use today's date
-- RECENCY: all headlines should be from the last 7 days — if a headline clearly refers to an event older than 7 days, skip it
+- RECENCY: all headlines should be from the last 4 days — if a headline clearly refers to an event older than 4 days, skip it
 - leadType = "both" if strong fit AND active signal; "signal" if event-driven but weaker fit; "lookalike" if brand fits lane but no active event
 - Omit any company already in the seed vendor list
 - Extract EVERY credible manufacturer or brand across both streams — aim for 50–80+ leads; do not stop early
